@@ -1,8 +1,6 @@
 package observatory
 
-import com.sksamuel.scrimage.{Image, Pixel, RGBColor}
-
-import scala.collection.mutable
+import com.sksamuel.scrimage.{Image, RGBColor}
 
 /**
   * 2nd milestone: basic visualization
@@ -41,13 +39,13 @@ object Visualization {
     * @return The predicted temperature at `location`
     */
   def predictTemperature(temperatures: Iterable[(Location, Temperature)], location: Location): Temperature = {
-    val distance_cache: mutable.Map[(Location, Location), Double] = mutable.Map()
-    temperatures.map(_._1).foreach(loc => {
-      val key: (Location, Location) = if (loc.lat * loc.lat + loc.lon * loc.lon < location.lat * location.lat + location.lon * location.lon) (loc, location) else (location, loc)
-      distance_cache.getOrElseUpdate(key, dist(loc, location))
-    })
-    val numerator = temperatures.foldRight(0d)((data, acc) => acc + data._2 / distance_cache((data._1, location)))
-    val denominator = temperatures.foldRight(0d)((data, acc) => acc + 1 / distance_cache((data._1, location)))
+    val distance_cache: Map[(Location, Location), Double] = temperatures.map(_._1).map(loc => {
+      val key: (Location, Location) = if (loc.lat * loc.lat + loc.lon * loc.lon < location.lat * location.lat + location.lon * location.lon)
+        (loc, location)      else        (location, loc)
+     (key , dist(loc, location))
+    }).toMap
+    val numerator = temperatures.foldRight(0d)((data, acc) => acc + data._2 / distance_cache.getOrElse((data._1, location), dist(data._1, location)))
+    val denominator = temperatures.foldRight(0d)((data, acc) => acc + 1 / distance_cache.getOrElse((data._1, location), dist(data._1, location)))
     numerator / denominator
   }
 
@@ -97,13 +95,14 @@ object Visualization {
   def visualize(temperatures: Iterable[(Location, Temperature)], colors: Iterable[(Temperature, Color)]): Image = {
 
     val image: Image = Image(360, 180)
-    for (longitude <- -180 to 180; latitude <- -90 to 90) {
+    for (longitude <- -180 to 180 - 1; latitude <- -90 to 90 - 1) {
       val temperature = predictTemperature(temperatures, Location(latitude, longitude))
       val color = interpolateColor(colors, temperature)
       val x = longitude + 180
       val y = latitude + 90
       image.setPixel(x, y, RGBColor(color.red, color.green, color.blue).toPixel)
     }
+    //image.output(new File("/Users/joe/Sites/scala-course/observatory/spaghetti.png"))
     image
 
 
