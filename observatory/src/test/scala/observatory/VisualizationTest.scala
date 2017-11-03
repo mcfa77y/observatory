@@ -51,7 +51,8 @@ trait VisualizationTest extends FunSuite with Checkers {
   }
 
   test("stations with no location are ignored x") {
-    val base_dir = "/src/main/resources/"
+//    val base_dir = "/src/main/resources/"
+    val base_dir = "/"
     val year = 1975
 
     val STATION_COUNT = 10
@@ -66,9 +67,10 @@ trait VisualizationTest extends FunSuite with Checkers {
     val foo = Extraction.locateTemperaturesSpark(year, stations_filename, temperature_filename)
 //    val foo = Extraction.locateTemperaturesSpark(year, stations, temperatures)
     val bar = Extraction.averageRecordsSpark(foo)
-    val image = Visualization.visualize(bar.collect.toList, color_scale)
+//    val image = Visualization.visualize(bar.collect.toList, color_scale)
+    val image = Visualization.visualizeSpark(bar, color_scale)
     //    assert(foo.size == 1)
-    image.output(new File("/Users/joe/Sites/scala-course/observatory/spaghetti.png"))
+    image.output(new File("/home/joe/Sites/scala_course/observatory/spaghetti.png"))
 
   }
 }

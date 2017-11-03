@@ -1,11 +1,13 @@
 package observatory
 
 import com.sksamuel.scrimage.{Image, RGBColor}
+import observatory.utils.SparkJob
+import org.apache.spark.rdd.RDD
 
 /**
   * 2nd milestone: basic visualization
   */
-object Visualization {
+object Visualization extends SparkJob {
   def isAntipodal(j: Location, k: Location): Boolean = {
     j.lat == -k.lat && (j.lon == k.lon + 180 || j.lon == k.lon - 180)
   }
@@ -28,7 +30,7 @@ object Visualization {
       val lambda2 = k.lon
 
       c = Math.acos(Math.sin(theta1.toRadians) * Math.sin(theta2.toRadians) + Math.cos(theta1.toRadians) * Math.cos(theta2.toRadians) * Math.cos(Math.abs(lambda1.toRadians - lambda2.toRadians)))
-//      c = cheap_acos(cheap_sin(theta1) * cheap_sin(theta2) + cheap_cos(theta1) * cheap_cos(theta2) * cheap_cos(Math.abs(lambda1 - lambda2)))
+      //      c = cheap_acos(cheap_sin(theta1) * cheap_sin(theta2) + cheap_cos(theta1) * cheap_cos(theta2) * cheap_cos(Math.abs(lambda1 - lambda2)))
 
     }
     EARTH_RADIUS_KM * c
@@ -41,11 +43,11 @@ object Visualization {
 
   def cheap_acos(x: Double): Double = {
     var index = (18.5 * x + 18.5).floor.toInt
-    if(index < 0){
-//      println("acos: offending x = " + x)
+    if (index < 0) {
+      //      println("acos: offending x = " + x)
       index = 0
-    } else if (index >= ACOS_ANS.size){
-      index = ACOS_ANS.size-1
+    } else if (index >= ACOS_ANS.size) {
+      index = ACOS_ANS.size - 1
     }
 
     ACOS_ANS(index)
@@ -53,13 +55,13 @@ object Visualization {
 
   def cheap_cos(theta_degree: Double): Double = {
     val mod_theta_degree = theta_degree % 360
-    val x = if((mod_theta_degree) > 0) mod_theta_degree else (mod_theta_degree) + 360
+    val x = if ((mod_theta_degree) > 0) mod_theta_degree else (mod_theta_degree) + 360
     var index: Int = ((x) * 0.1).floor.toInt
-    if(index < 0){
+    if (index < 0) {
       //      println("acos: offending x = " + x)
       index = 0
-    } else if (index >= COS_ANS.size){
-      index = COS_ANS.size-1
+    } else if (index >= COS_ANS.size) {
+      index = COS_ANS.size - 1
     }
     COS_ANS(index)
   }
@@ -74,6 +76,19 @@ object Visualization {
     * @return The predicted temperature at `location`
     */
   def predictTemperature(temperatures: Iterable[(Location, Temperature)], location: Location): Temperature = {
+    val distance_threshold_km = 100
+    val location_sample_count = 4
+    val closest_locations = temperatures
+      .filter(loc_temp => dist_KM(loc_temp._1, location) < distance_threshold_km)
+      .take(location_sample_count)
+
+    val numerator = closest_locations.foldRight(0d)((data, acc) => acc + data._2 / dist_KM(data._1, location))
+    val denominator = closest_locations.foldRight(0d)((data, acc) => acc + 1 / dist_KM(data._1, location))
+    numerator / denominator
+    //    predictTemperatureSpark(sc.parallelize(temperatures.toList), location)
+  }
+
+  def predictTemperatureSpark(temperatures: RDD[(Location, Temperature)], location: Location): Temperature = {
     def createKey(l0: Location): (Location, Location) = {
       if (l0.lat * l0.lat + l0.lon * l0.lon < location.lat * location.lat + location.lon * location.lon)
         (l0, location) else (location, l0)
@@ -88,25 +103,7 @@ object Visualization {
     val numerator = closest_locations.foldRight(0d)((data, acc) => acc + data._2 / dist_KM(data._1, location))
     val denominator = closest_locations.foldRight(0d)((data, acc) => acc + 1 / dist_KM(data._1, location))
     numerator / denominator
-//    predictTemperatureSpark(sc.parallelize(temperatures.toList), location)
   }
-
-//  def predictTemperatureSpark(temperatures: RDD[(Location, Temperature)], location: Location): Temperature = {
-//    def createKey(l0: Location): (Location, Location) = {
-//      if (l0.lat * l0.lat + l0.lon * l0.lon < location.lat * location.lat + location.lon * location.lon)
-//        (l0, location) else (location, l0)
-//    }
-//
-//    val distance_threshold_km = 100
-//    val location_sample_count = 4
-//    val closest_locations = temperatures
-//      .filter(loc_temp => dist_KM(loc_temp._1, location) < distance_threshold_km)
-//      .take(location_sample_count)
-//
-//    val numerator = closest_locations.foldRight(0d)((data, acc) => acc + data._2 / dist_KM(data._1, location))
-//    val denominator = closest_locations.foldRight(0d)((data, acc) => acc + 1 / dist_KM(data._1, location))
-//    numerator / denominator
-//  }
 
   /** @param points Pairs containing a value and its associated color
     * @param value  The value to interpolate
@@ -154,7 +151,7 @@ object Visualization {
   def visualize(temperatures: Iterable[(Location, Temperature)], colors: Iterable[(Temperature, Color)]): Image = {
 
     val image: Image = Image(360, 180)
-    for (longitude <- -180 to 180 - 1; latitude <- -90 to 90 - 1) {
+    for (longitude <- 179 to -180 by -1; latitude <- 89 to -90 by -1) {
       val temperature = predictTemperature(temperatures, Location(latitude, longitude))
       val color = interpolateColor(colors, temperature)
       val x = longitude + 180
@@ -166,20 +163,38 @@ object Visualization {
 
   }
 
-//  def visualizeSpark(temperatures: RDD[(Location, Temperature)], colors: Iterable[(Temperature, Color)]): Image = {
+  def visualizeSpark(temperatures: RDD[(Location, Temperature)], colors: Iterable[(Temperature, Color)]): Image = {
+    val width = 360
+    val height = 180
+    val image: Image = Image(width, height)
+    val end = (width - 1) * (height - 1)
+    val pixels = 0 to end
+
+    temperatures.foreach((loc_temp)=> {
+      val loc = loc_temp._1
+      val temp = predictTemperatureSpark(temperatures, loc)
+      val color = interpolateColor(colors, temp)
+      image.setPixel(loc.lon.toInt, loc.lat.toInt, RGBColor(color.red, color.green, color.blue).toPixel)
+    })
+//    pixels.foreach((pixel) => {
+//      val longitude = pixel / width - width / 2
+//      val latitude = pixel % width - height / 2
 //
-//    val image: Image = Image(360, 180)
-//    for (longitude <- -180 to 180 - 1; latitude <- -90 to 90 - 1) {
 //      val temperature = predictTemperatureSpark(temperatures, Location(latitude, longitude))
 //      val color = interpolateColor(colors, temperature)
-//      val x = longitude + 180
-//      val y = latitude + 90
+//      val x = pixel / width
+//      val y = - pixel % width + height - 1
+//      if (pixel % 10 == 0) {
+//        println("status: " + y / end.toDouble)
+//      }
+//      println(x+", " +y)
 //      image.setPixel(x, y, RGBColor(color.red, color.green, color.blue).toPixel)
-//    }
-//    image
-//
-//
-//  }
+//    })
+
+    image
+
+
+  }
 
 }
 

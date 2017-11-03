@@ -17,7 +17,7 @@ trait ExtractionTest extends FunSuite {
 
 
   test("stations with no location are ignored"){
-    val base_dir = "src/main/resources/"
+    val base_dir = "/"
     val year = 1975
     val temperature_filename = base_dir + year + "_test.csv"
     val stations_filename = base_dir + "stations_empty_test.csv"
