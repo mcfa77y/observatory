@@ -2,24 +2,14 @@ package observatory
 
 import java.time.LocalDate
 
+import observatory.utils.SparkJob
 import org.apache.spark.rdd.RDD
-import org.apache.spark.SparkContext
-import org.apache.spark.SparkContext._
-import org.apache.spark.SparkConf
-import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.SparkConf
-//import spark.implicites._
+
 /**
   * 1st milestone: data extraction
   */
-object Extraction {
+object Extraction extends SparkJob{
 
-
-  Logger.getLogger("org.apache.spark").setLevel(Level.WARN)
-  val conf = new SparkConf().setAppName("observatory").setMaster("local[*]")
-  val sc = new SparkContext(conf)
-  //  val sc: SparkSession = SparkSession.builder().appName("observatory").master("local").getOrCreate()
 
   def fahrenheitToCelsius(f: Double): Double =
     (f - 32.0) * (5.0 / 9.0)
@@ -31,11 +21,9 @@ object Extraction {
     * @return A sequence containing triplets (date, location, temperature)
     */
   def locateTemperatures(year: Year, stationsFile: String, temperaturesFile: String): Iterable[(LocalDate, Location, Temperature)] = {
-
     val stations: RDD[String] = sc.textFile(this.getClass.getResource(stationsFile).getPath, 8)
     val temperatures: RDD[String] = sc.textFile(this.getClass.getResource(temperaturesFile).getPath, 8)
-    sparkLocateTemperatures(year, stations, temperatures).collect.toSeq
-
+    locateTemperaturesSpark(year, stations, temperatures).collect.toSeq
   }
 
   def foobar(data: String, pred: String => Boolean): Boolean = {
@@ -45,10 +33,18 @@ object Extraction {
   def doubleNot0(data: String): Boolean = {
     data.toDouble != 0
   }
+  def locateTemperaturesSpark(year: Year, stationsFile: String, temperaturesFile: String): RDD[(LocalDate, Location, Temperature)] = {
+    val stations: RDD[String] = sc.textFile(this.getClass.getResource(stationsFile).getPath, 8)
+    val temperatures: RDD[String] = sc.textFile(this.getClass.getResource(temperaturesFile).getPath, 8)
+    locateTemperaturesSpark(year, stations, temperatures)
+  }
 
-  def sparkLocateTemperatures(year: Year, stations: RDD[String], temperatures: RDD[String]): RDD[(LocalDate, Location, Temperature)] = {
-    val s = stations
-      .map(row => row.split(","))
+  def locateTemperaturesSpark(year: Year, stations: RDD[String], temperatures: RDD[String]): RDD[(LocalDate, Location, Temperature)] = {
+//    println(stationsFile)
+//    val stations: RDD[String] = sc.textFile(this.getClass.getResource(stationsFile).getPath, 8)
+//    val temperatures: RDD[String] = sc.textFile(this.getClass.getResource(temperaturesFile).getPath, 8)
+
+    val s = stations.map(row => row.split(","))
       .filter(_.length > 3)
       .filter(data => foobar(data(3), doubleNot0) && foobar(data(3), doubleNot0))
       .map(data => Station(data(0), data(1), Location(data(2).toDouble, data(3).toDouble)))
@@ -78,11 +74,11 @@ object Extraction {
     */
   def locationYearlyAverageRecords(records: Iterable[(LocalDate, Location, Temperature)]): Iterable[(Location, Temperature)] = {
 
-    sparkAverageRecords(sc.parallelize(records.toList)).collect.toSeq
+    averageRecordsSpark(sc.parallelize(records.toList)).collect.toSeq
   }
 
   // Added method:
-  def sparkAverageRecords(records: RDD[(LocalDate, Location, Temperature)]): RDD[(Location, Temperature)] = {
+  def averageRecordsSpark(records: RDD[(LocalDate, Location, Temperature)]): RDD[(Location, Temperature)] = {
     //    val a = records.groupBy(record => record._2)
     ////    val ac = a.collect
     //    val b = a.mapValues(x => x.foldRight((0d, 0))((row, acc ) => (row._3 + acc._1, acc._2 + 1)))

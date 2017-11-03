@@ -1,6 +1,5 @@
 package observatory
-import observatory.Extraction.{sc, sparkAverageRecords, sparkLocateTemperatures}
-import org.apache.spark.rdd.RDD
+import observatory.Extraction.{averageRecordsSpark, locateTemperaturesSpark}
 
 object Main extends App {
   val base_dir = "src/main/resources/"
@@ -8,15 +7,13 @@ object Main extends App {
   val year = 1975
   val temperature_filename = base_dir + year + ".csv"
 
-  val stations: RDD[String] = sc.textFile(stations_filename)
-  val temperatures: RDD[String] = sc.textFile(temperature_filename)
-  val foo = sparkLocateTemperatures(year, stations, temperatures)
+  val foo = Extraction.locateTemperaturesSpark(year, stations_filename, temperature_filename)
 
 
   //  val foo = Extraction.locateTemperatures(year, stations_filename, temperature_filename)
   //  val foo = Extraction.locateTemperatures(year, stations_filename, temperature_filename)
   //  val bar = Extraction.locationYearlyAverageRecords(foo)
-  val bar = sparkAverageRecords(foo)
+  val bar = averageRecordsSpark(foo)
   //  println("locate temp size: " + foo.size)
   println("location Year avg rec size: " + bar.count)
 
