@@ -15,3 +15,23 @@ project/plugins/project/
 # Scala-IDE specific
 .scala_dependencies
 .worksheet
+\.sync/
+
+*.dat
+**/\.idea
+
+observatory2/src/main/resources/
+observatory/.idea
+barneshut/
+
+kmeans/
+observatory2/
+reductions/
+stackoverflow/
+timeusage/
+wikipedia/
+wikipedia2/
+
+observatory/\.idea_old/
+
+observatory/metastore_db/
