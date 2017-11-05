@@ -79,12 +79,14 @@ object Visualization {
         (l0, location) else (location, l0)
     }
 
-    val distance_threshold_km = 100
-    val location_sample_count = 4
+    val distance_threshold_km = 2000
+    val location_sample_count = 10
     val closest_locations = temperatures
       .filter(loc_temp => dist_KM(loc_temp._1, location) < distance_threshold_km)
       .take(location_sample_count)
-
+//    if(closest_locations.size<location_sample_count){
+//      println("closest_locations < "+location_sample_count+": " + closest_locations.size)
+//    }
     val numerator = closest_locations.foldRight(0d)((data, acc) => acc + data._2 / dist_KM(data._1, location))
     val denominator = closest_locations.foldRight(0d)((data, acc) => acc + 1 / dist_KM(data._1, location))
     numerator / denominator
@@ -143,7 +145,7 @@ object Visualization {
     val red: Int = (m * (maxColor.red - minColor.red) + minColor.red).toInt
     val blue: Int = (m * (maxColor.blue - minColor.blue) + minColor.blue).toInt
     val green: Int = (m * (maxColor.green - minColor.green) + minColor.green).toInt
-    Color(red, blue, green)
+    Color(red, green, blue)
   }
 
   /**
@@ -152,16 +154,16 @@ object Visualization {
     * @return A 360×180 image where each pixel shows the predicted temperature at its location
     */
   def visualize(temperatures: Iterable[(Location, Temperature)], colors: Iterable[(Temperature, Color)]): Image = {
-
     val image: Image = Image(360, 180)
-    for (longitude <- -180 to 180 - 1; latitude <- -90 to 90 - 1) {
-      val temperature = predictTemperature(temperatures, Location(latitude, longitude))
+    temperatures.foreach((loc_temp)=>{
+      val loc = loc_temp._1
+      val temperature = predictTemperature(temperatures, loc)
       val color = interpolateColor(colors, temperature)
-      val x = longitude + 180
-      val y = latitude + 90
+      val x = loc.lon.toInt + 180
+      val y = loc.lat.toInt + 90
       image.setPixel(x, y, RGBColor(color.red, color.green, color.blue).toPixel)
-    }
-    image
+    })
+    image.flipY
 
 
   }

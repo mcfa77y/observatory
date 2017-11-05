@@ -2,6 +2,7 @@ package observatory
 
 
 import java.io._
+import java.time.ZonedDateTime
 
 import org.scalatest.FunSuite
 import org.scalatest.prop.Checkers
@@ -68,7 +69,9 @@ trait VisualizationTest extends FunSuite with Checkers {
     val bar = Extraction.averageRecordsSpark(foo)
     val image = Visualization.visualize(bar.collect.toList, color_scale)
     //    assert(foo.size == 1)
-    image.output(new File("/Users/joe/Sites/scala-course/observatory/spaghetti.png"))
+    val zonedDateTimeIst = ZonedDateTime.now()
+    val name = "spagetti_"+zonedDateTimeIst.getHour.toString +"_"+zonedDateTimeIst.getMinute.toString + ".png"
+    image.output(new File("/Users/joe/Sites/scala-course/observatory/"+name))
 
   }
 }
