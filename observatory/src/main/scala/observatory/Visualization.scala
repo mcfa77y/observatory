@@ -74,21 +74,36 @@ object Visualization {
     * @return The predicted temperature at `location`
     */
   def predictTemperature(temperatures: Iterable[(Location, Temperature)], location: Location): Temperature = {
-    def createKey(l0: Location): (Location, Location) = {
-      if (l0.lat * l0.lat + l0.lon * l0.lon < location.lat * location.lat + location.lon * location.lon)
-        (l0, location) else (location, l0)
-    }
+//    println("predict temps: " + location)
+//    temperatures.foreach((loc_temp)=>{
+//      println("\tl: " + loc_temp._1 +" t: " + loc_temp._2)
+//    })
 
-    val distance_threshold_km = 2000
-    val location_sample_count = 10
-    val closest_locations = temperatures
+    var distance_threshold_km = 1000
+    val location_sample_count = Math.min(10, temperatures.size)
+    var closest_locations = temperatures
       .filter(loc_temp => dist_KM(loc_temp._1, location) < distance_threshold_km)
       .take(location_sample_count)
-//    if(closest_locations.size<location_sample_count){
-//      println("closest_locations < "+location_sample_count+": " + closest_locations.size)
-//    }
+
+    while (closest_locations.size<location_sample_count){
+      distance_threshold_km *=2
+      println("closest_locations < "+location_sample_count+": " + closest_locations.size +"trying again with radius size:  " + distance_threshold_km)
+      closest_locations = temperatures
+        .filter(loc_temp => dist_KM(loc_temp._1, location) < distance_threshold_km)
+        .take(location_sample_count)
+    }
+    val foo = closest_locations.find(_._1 == location)
+    if(foo.isDefined){
+      return foo.get._2
+    }
     val numerator = closest_locations.foldRight(0d)((data, acc) => acc + data._2 / dist_KM(data._1, location))
     val denominator = closest_locations.foldRight(0d)((data, acc) => acc + 1 / dist_KM(data._1, location))
+    if((numerator / denominator).isNaN || denominator == 0){
+      println("things are not right there is a NaN here!")
+      println("\tsize: " + closest_locations.size)
+      println("\tresult tl: " + numerator +"/"+denominator)
+    }
+
     numerator / denominator
 //    predictTemperatureSpark(sc.parallelize(temperatures.toList), location)
   }
@@ -123,10 +138,11 @@ object Visualization {
     if (value <= minTC._1) {
       return minTC._2
     }
-
-
-    var maxTemp = 10000d
-    var minTemp = -10000d
+//    points.foreach((loc_temp)=>{
+//      println("\ttemp: " + loc_temp._1 +" color: " + loc_temp._2)
+//    })
+    var maxTemp = Double.MaxValue
+    var minTemp = Double.MinValue
     var maxColor = Color(0, 0, 0)
     var minColor = Color(0, 0, 0)
     points.foreach(tc => {
@@ -142,9 +158,13 @@ object Visualization {
       }
     })
     val m: Double = (value - minTemp) / (maxTemp - minTemp)
-    val red: Int = (m * (maxColor.red - minColor.red) + minColor.red).toInt
-    val blue: Int = (m * (maxColor.blue - minColor.blue) + minColor.blue).toInt
-    val green: Int = (m * (maxColor.green - minColor.green) + minColor.green).toInt
+    val red: Int = (m * (maxColor.red - minColor.red) + minColor.red).round.toInt
+    val blue: Int = (m * (maxColor.blue - minColor.blue) + minColor.blue).round.toInt
+    val green: Int = (m * (maxColor.green - minColor.green) + minColor.green).round.toInt
+    if(red == 0 && blue == 0 && green == 0){
+      println("things are black")
+    }
+//    println("\tresult c: " + Color(red, green, blue))
     Color(red, green, blue)
   }
 
@@ -158,6 +178,9 @@ object Visualization {
     temperatures.foreach((loc_temp)=>{
       val loc = loc_temp._1
       val temperature = predictTemperature(temperatures, loc)
+      if(temperature.isNaN){
+        println("this is not the temp you're looking for NaN")
+      }
       val color = interpolateColor(colors, temperature)
       val x = loc.lon.toInt + 180
       val y = loc.lat.toInt + 90

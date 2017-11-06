@@ -51,7 +51,28 @@ trait VisualizationTest extends FunSuite with Checkers {
     }
   }
 
-  test("stations with no location are ignored x") {
+//  test("interpolate color 00"){
+//    val points = List((1.0, Color(255,0,0)),
+//      (2.0, Color(0,0,255)),
+//      (3.0, Color(0,255,0)))
+//    val bar = Visualization.interpolateColor(points, 1.5)
+//    assert(bar == Color(128,0,128))
+//  }
+//  test("interpolate color 01"){
+//    val points = List((-1.901570529E9, Color(255,0,0)),
+//      (0.0, Color(0,0,255)))
+//    val bar = Visualization.interpolateColor(points, -9.507852645E8)
+//    assert(bar == Color(128,0,128))
+//  }
+
+  test("interpolate color 02"){
+    val points = List((1.0, Color(255,0,0)),
+      (2.0, Color(0,0,255)),
+      (3.0, Color(0,255,0)))
+    val bar = Visualization.interpolateColor(points, 1.25)
+    assert(bar == Color(191,0,64))
+  }
+  test("make image") {
     val base_dir = "/src/main/resources/"
     val year = 1975
 
@@ -71,7 +92,8 @@ trait VisualizationTest extends FunSuite with Checkers {
     //    assert(foo.size == 1)
     val zonedDateTimeIst = ZonedDateTime.now()
     val name = "spagetti_"+zonedDateTimeIst.getHour.toString +"_"+zonedDateTimeIst.getMinute.toString + ".png"
-    image.output(new File("/Users/joe/Sites/scala-course/observatory/"+name))
+    val path = new File(".").getCanonicalFile +"/"+ name
+//    image.output(new File(path))
 
   }
 }
