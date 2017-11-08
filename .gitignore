@@ -35,3 +35,5 @@ wikipedia2/
 observatory/\.idea_old/
 
 observatory/metastore_db/
+
+*.tmp

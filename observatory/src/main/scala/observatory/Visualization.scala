@@ -1,13 +1,35 @@
 package observatory
 
-import com.sksamuel.scrimage.{Image, RGBColor}
+import com.sksamuel.scrimage.{Image, Pixel, RGBColor}
+import observatory.utils.SparkJob
+import org.apache.spark.rdd.RDD
 
 /**
   * 2nd milestone: basic visualization
   */
-object Visualization {
+object Visualization extends SparkJob {
   def isAntipodal(j: Location, k: Location): Boolean = {
     j.lat == -k.lat && (j.lon == k.lon + 180 || j.lon == k.lon - 180)
+  }
+
+  class Memoize1[-T, +R](f: T => R) extends (T => R) {
+    import scala.collection.mutable
+    private[this] val vals = mutable.Map.empty[T, R]
+
+    def apply(x: T): R = {
+      if (vals.contains(x)) {
+        vals(x)
+      }
+      else {
+        val y = f(x)
+        vals += ((x, y))
+        y
+      }
+    }
+  }
+
+  object Memoize1 {
+    def apply[T, R](f: T => R) = new Memoize1(f)
   }
 
   val EARTH_RADIUS_KM = 6371d
@@ -28,12 +50,15 @@ object Visualization {
       val lambda2 = k.lon
 
       c = Math.acos(Math.sin(theta1.toRadians) * Math.sin(theta2.toRadians) + Math.cos(theta1.toRadians) * Math.cos(theta2.toRadians) * Math.cos(Math.abs(lambda1.toRadians - lambda2.toRadians)))
-//      c = cheap_acos(cheap_sin(theta1) * cheap_sin(theta2) + cheap_cos(theta1) * cheap_cos(theta2) * cheap_cos(Math.abs(lambda1 - lambda2)))
+      //      c = cheap_acos(cheap_sin(theta1) * cheap_sin(theta2) + cheap_cos(theta1) * cheap_cos(theta2) * cheap_cos(Math.abs(lambda1 - lambda2)))
 
     }
     EARTH_RADIUS_KM * c
 
   }
+
+
+
 
   val TO_RADIANS = 0.01745329251
   val COS_ANS = Array(1, 0.984807753, 0.9396926209, 0.8660254039, 0.7660444434, 0.6427876101, 0.5000000005, 0.342020144, 0.1736481785, 0.0000000008948966625, -0.1736481767, -0.3420201423, -0.499999999, -0.6427876087, -0.7660444422, -0.866025403, -0.9396926202, -0.9848077527, -1, -0.9848077533, -0.9396926215, -0.8660254048, -0.7660444445, -0.6427876114, -0.5000000021, -0.3420201457, -0.1736481802, -0.000000002684689987, 0.1736481749, 0.3420201406, 0.4999999974, 0.6427876073, 0.7660444411, 0.8660254021, 0.9396926196, 0.9848077524)
@@ -41,11 +66,11 @@ object Visualization {
 
   def cheap_acos(x: Double): Double = {
     var index = (18.5 * x + 18.5).floor.toInt
-    if(index < 0){
-//      println("acos: offending x = " + x)
+    if (index < 0) {
+      //      println("acos: offending x = " + x)
       index = 0
-    } else if (index >= ACOS_ANS.size){
-      index = ACOS_ANS.size-1
+    } else if (index >= ACOS_ANS.size) {
+      index = ACOS_ANS.size - 1
     }
 
     ACOS_ANS(index)
@@ -53,13 +78,13 @@ object Visualization {
 
   def cheap_cos(theta_degree: Double): Double = {
     val mod_theta_degree = theta_degree % 360
-    val x = if((mod_theta_degree) > 0) mod_theta_degree else (mod_theta_degree) + 360
+    val x = if ((mod_theta_degree) > 0) mod_theta_degree else (mod_theta_degree) + 360
     var index: Int = ((x) * 0.1).floor.toInt
-    if(index < 0){
+    if (index < 0) {
       //      println("acos: offending x = " + x)
       index = 0
-    } else if (index >= COS_ANS.size){
-      index = COS_ANS.size-1
+    } else if (index >= COS_ANS.size) {
+      index = COS_ANS.size - 1
     }
     COS_ANS(index)
   }
@@ -67,6 +92,58 @@ object Visualization {
   def cheap_sin(theta_degree: Double): Double = {
     cheap_cos(90 - theta_degree)
   }
+//  val memoize_dist_km = Memoize1(dist_KM)
+  def get_closest_locations(temperatures: Iterable[(Location, Temperature)],
+                            location: Location,
+                            distance_threshold_km: Double,
+                            location_sample_count: Int
+                           ): List[(Location, Temperature)] = {
+    //    def createKey(l0: Location): (Location, Location) = {
+    //      if (l0.lat * l0.lat + l0.lon * l0.lon < location.lat * location.lat + location.lon * location.lon)
+    //        (l0, location) else (location, l0)
+    //    }
+    //    var cache=collection.mutable.Map[(Location, Location), Double]()
+    //    cache ++ distance_cache
+    val closest_locations: List[(Location, Temperature)] = temperatures
+      .filter(loc_temp => {
+        dist_KM(loc_temp._1, location) < distance_threshold_km
+      })
+      .take(location_sample_count).toList
+
+    if (closest_locations.size < location_sample_count) {
+      //      println("expanding radius to " + distance_threshold_km * 2)
+      get_closest_locations(temperatures, location, distance_threshold_km * 2, location_sample_count)
+    } else {
+      closest_locations
+    }
+  }
+
+
+  def get_closest_locations_spark(temperatures: RDD[(Location, Temperature)],
+                                  location: Location,
+                                  distance_threshold_km: Double,
+                                  location_sample_count: Int
+                                 ): List[(Location, Temperature)] = {
+    //    def createKey(l0: Location): (Location, Location) = {
+    //      if (l0.lat * l0.lat + l0.lon * l0.lon < location.lat * location.lat + location.lon * location.lon)
+    //        (l0, location) else (location, l0)
+    //    }
+    //    var cache=collection.mutable.Map[(Location, Location), Double]()
+    //    cache ++ distance_cache
+    val closest_locations: List[(Location, Temperature)] = temperatures
+      .filter(loc_temp => {
+        dist_KM(loc_temp._1, location) < distance_threshold_km
+      })
+      .take(location_sample_count).toList
+
+    if (closest_locations.size < location_sample_count) {
+      //      println("expanding radius to " + distance_threshold_km * 2)
+      get_closest_locations_spark(temperatures, location, distance_threshold_km * 2, location_sample_count)
+    } else {
+      closest_locations
+    }
+  }
+
 
   /**
     * @param temperatures Known temperatures: pairs containing a location and the temperature at this location
@@ -74,56 +151,51 @@ object Visualization {
     * @return The predicted temperature at `location`
     */
   def predictTemperature(temperatures: Iterable[(Location, Temperature)], location: Location): Temperature = {
-//    println("predict temps: " + location)
-//    temperatures.foreach((loc_temp)=>{
-//      println("\tl: " + loc_temp._1 +" t: " + loc_temp._2)
-//    })
+    //    println("predict temps: " + location)
+    //    temperatures.foreach((loc_temp)=>{
+    //      println("\tl: " + loc_temp._1 +" t: " + loc_temp._2)
+    //    })
 
-    var distance_threshold_km = 1000
-    val location_sample_count = Math.min(10, temperatures.size)
-    var closest_locations = temperatures
-      .filter(loc_temp => dist_KM(loc_temp._1, location) < distance_threshold_km)
-      .take(location_sample_count)
-
-    while (closest_locations.size<location_sample_count){
-      distance_threshold_km *=2
-      println("closest_locations < "+location_sample_count+": " + closest_locations.size +"trying again with radius size:  " + distance_threshold_km)
-      closest_locations = temperatures
-        .filter(loc_temp => dist_KM(loc_temp._1, location) < distance_threshold_km)
-        .take(location_sample_count)
+    def createKey(l0: Location): (Location, Location) = {
+      if (l0.lat * l0.lat + l0.lon * l0.lon < location.lat * location.lat + location.lon * location.lon)
+        (l0, location) else (location, l0)
     }
+
+    val distance_threshold_km = 100
+    val location_sample_count = Math.min(10, temperatures.size)
+
+
+    val closest_locations: List[(Location, Temperature)] = get_closest_locations(temperatures, location, distance_threshold_km, location_sample_count)
     val foo = closest_locations.find(_._1 == location)
-    if(foo.isDefined){
+    if (foo.isDefined) {
       return foo.get._2
     }
     val numerator = closest_locations.foldRight(0d)((data, acc) => acc + data._2 / dist_KM(data._1, location))
     val denominator = closest_locations.foldRight(0d)((data, acc) => acc + 1 / dist_KM(data._1, location))
-    if((numerator / denominator).isNaN || denominator == 0){
+    if ((numerator / denominator).isNaN || denominator == 0) {
       println("things are not right there is a NaN here!")
       println("\tsize: " + closest_locations.size)
-      println("\tresult tl: " + numerator +"/"+denominator)
+      println("\tresult tl: " + numerator + "/" + denominator)
     }
 
     numerator / denominator
-//    predictTemperatureSpark(sc.parallelize(temperatures.toList), location)
+    //    predictTemperatureSpark(sc.parallelize(temperatures.toList), location)
   }
 
-//  def predictTemperatureSpark(temperatures: RDD[(Location, Temperature)], location: Location): Temperature = {
-//    def createKey(l0: Location): (Location, Location) = {
-//      if (l0.lat * l0.lat + l0.lon * l0.lon < location.lat * location.lat + location.lon * location.lon)
-//        (l0, location) else (location, l0)
-//    }
-//
-//    val distance_threshold_km = 100
-//    val location_sample_count = 4
-//    val closest_locations = temperatures
-//      .filter(loc_temp => dist_KM(loc_temp._1, location) < distance_threshold_km)
-//      .take(location_sample_count)
-//
-//    val numerator = closest_locations.foldRight(0d)((data, acc) => acc + data._2 / dist_KM(data._1, location))
-//    val denominator = closest_locations.foldRight(0d)((data, acc) => acc + 1 / dist_KM(data._1, location))
-//    numerator / denominator
-//  }
+  def predictTemperatureSpark(temperatures: RDD[(Location, Temperature)], location: Location): Temperature = {
+    def createKey(l0: Location): (Location, Location) = {
+      if (l0.lat * l0.lat + l0.lon * l0.lon < location.lat * location.lat + location.lon * location.lon)
+        (l0, location) else (location, l0)
+    }
+
+    val distance_threshold_km = 100
+    val location_sample_count = 4
+    val closest_locations = get_closest_locations_spark(temperatures, location, distance_threshold_km, location_sample_count)
+
+    val numerator = closest_locations.foldRight(0d)((data, acc) => acc + data._2 / dist_KM(data._1, location))
+    val denominator = closest_locations.foldRight(0d)((data, acc) => acc + 1 / dist_KM(data._1, location))
+    numerator / denominator
+  }
 
   /** @param points Pairs containing a value and its associated color
     * @param value  The value to interpolate
@@ -138,9 +210,9 @@ object Visualization {
     if (value <= minTC._1) {
       return minTC._2
     }
-//    points.foreach((loc_temp)=>{
-//      println("\ttemp: " + loc_temp._1 +" color: " + loc_temp._2)
-//    })
+    //    points.foreach((loc_temp)=>{
+    //      println("\ttemp: " + loc_temp._1 +" color: " + loc_temp._2)
+    //    })
     var maxTemp = Double.MaxValue
     var minTemp = Double.MinValue
     var maxColor = Color(0, 0, 0)
@@ -161,10 +233,10 @@ object Visualization {
     val red: Int = (m * (maxColor.red - minColor.red) + minColor.red).round.toInt
     val blue: Int = (m * (maxColor.blue - minColor.blue) + minColor.blue).round.toInt
     val green: Int = (m * (maxColor.green - minColor.green) + minColor.green).round.toInt
-    if(red == 0 && blue == 0 && green == 0){
+    if (red == 0 && blue == 0 && green == 0) {
       println("things are black")
     }
-//    println("\tresult c: " + Color(red, green, blue))
+    //    println("\tresult c: " + Color(red, green, blue))
     Color(red, green, blue)
   }
 
@@ -175,36 +247,96 @@ object Visualization {
     */
   def visualize(temperatures: Iterable[(Location, Temperature)], colors: Iterable[(Temperature, Color)]): Image = {
     val image: Image = Image(360, 180)
-    temperatures.foreach((loc_temp)=>{
-      val loc = loc_temp._1
-      val temperature = predictTemperature(temperatures, loc)
-      if(temperature.isNaN){
+
+    for (longitude <- -180 to 180 - 1; latitude <- -90 to 90 - 1) {
+      val temperature = predictTemperature(temperatures, Location(latitude, longitude))
+      if (temperature.isNaN) {
         println("this is not the temp you're looking for NaN")
       }
       val color = interpolateColor(colors, temperature)
-      val x = loc.lon.toInt + 180
-      val y = loc.lat.toInt + 90
+      val x = longitude + 180
+      val y = latitude + 90
       image.setPixel(x, y, RGBColor(color.red, color.green, color.blue).toPixel)
-    })
+    }
+
+
+    //    temperatures.foreach((loc_temp)=>{
+    //      val loc = loc_temp._1
+    //      val temperature = predictTemperature(temperatures, loc)
+    //      if(temperature.isNaN){
+    //        println("this is not the temp you're looking for NaN")
+    //      }
+    //      val color = interpolateColor(colors, temperature)
+    //      val x = loc.lon.toInt + 180
+    //      val y = loc.lat.toInt + 90
+    //      image.setPixel(x, y, RGBColor(color.red, color.green, color.blue).toPixel)
+    //    })
     image.flipY
 
 
   }
 
-//  def visualizeSpark(temperatures: RDD[(Location, Temperature)], colors: Iterable[(Temperature, Color)]): Image = {
-//
-//    val image: Image = Image(360, 180)
-//    for (longitude <- -180 to 180 - 1; latitude <- -90 to 90 - 1) {
-//      val temperature = predictTemperatureSpark(temperatures, Location(latitude, longitude))
-//      val color = interpolateColor(colors, temperature)
-//      val x = longitude + 180
-//      val y = latitude + 90
-//      image.setPixel(x, y, RGBColor(color.red, color.green, color.blue).toPixel)
-//    }
-//    image
-//
-//
-//  }
+  def map_to(domain_x: Double, range_x: Double, domain_y: Double, range_y: Double) = (domain_x_prime: Double) => {
+    val m = (range_y - domain_y) / (range_x - domain_x)
+    val b = range_y - m * range_x
+    m * domain_x_prime + b
+  }
+
+  def visualizeSpark(temperatures: RDD[(Location, Temperature)], colors: Iterable[(Temperature, Color)]): Image = {
+    case class Pixel_Record(x: Int, y: Int, pixel: Pixel)
+    val width = 360
+    val height = 180
+    val image: Image = Image(width, height)
+    val lon_deg_range = (-180 to 180 - 1)
+    val lat_deg_range = (-90 to 90 - 1)
+
+    val get_x = map_to(0, 360, -180, 180)
+    val get_y = map_to(0, 180, -90, -90)
+
+    val t_list = temperatures.collect.toList
+
+    def some_func(location: Location): Pixel_Record = {
+      val temperature = predictTemperature(t_list, location)
+      val color = interpolateColor(colors, temperature)
+      val x = get_x(location.lon).toInt
+      val y = get_y(location.lat).toInt
+      Pixel_Record(x, y, RGBColor(color.red, color.green, color.blue).toPixel)
+    }
+
+
+    // make lat lon pairs
+    val world_location: List[Location] =
+      for (lat_deg <- lat_deg_range.toList;
+           lon_deg <- lon_deg_range.toList)
+        yield Location(lat_deg, lon_deg)
+
+    val pixels = sc.parallelize(world_location)
+        .filter(location => 0>= get_x(location.lon) && get_x(location.lon)<360)
+        .filter(location => 0>= get_y(location.lat) && get_y(location.lat)<180)
+      .map(some_func).collect.toSeq
+
+    //      val pixels = sc.parallelize(0 to (width) * (height) -1).map(index => {
+    //        some_func(Location(index/width, index%width))
+    //      }).collect.toSeq
+
+    pixels
+      .filter(pixel_record => pixel_record.x < width && pixel_record.y < height)
+      .foreach((pixel_record: Pixel_Record) => {
+        println(pixel_record)
+        image.setPixel(pixel_record.x, pixel_record.y, pixel_record.pixel)
+      })
+
+    //      for (longitude <- -180 to 180 - 1; latitude <- -90 to 90 - 1) {
+    //        val temperature = predictTemperatureSpark(temperatures, Location(latitude, longitude))
+    //        val color = interpolateColor(colors, temperature)
+    //        val x = longitude + 180
+    //        val y = latitude + 90
+    //        image.setPixel(x, y, RGBColor(color.red, color.green, color.blue).toPixel)
+    //      }
+    image.flipY
+
+
+  }
 
 }
 

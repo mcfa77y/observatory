@@ -93,7 +93,34 @@ trait VisualizationTest extends FunSuite with Checkers {
     val zonedDateTimeIst = ZonedDateTime.now()
     val name = "spagetti_"+zonedDateTimeIst.getHour.toString +"_"+zonedDateTimeIst.getMinute.toString + ".png"
     val path = new File(".").getCanonicalFile +"/"+ name
-//    image.output(new File(path))
+    image.output(new File(path))
+
+  }
+
+
+
+  test("make image spark") {
+    val base_dir = "/src/main/resources/"
+    val year = 1975
+
+    val STATION_COUNT = 10
+    //    val stations: RDD[Station] = sc.parallelize(Array((Station("id_0", "wban_0", Location(100d, 100d)))))
+    //    val stations: RDD[String] = sc.parallelize(generateStations(STATION_COUNT))
+    //    val temperatures: RDD[String] = sc.parallelize(generateTemps(STATION_COUNT))
+
+    //    val foo = Extraction.sparkLocateTemperatures(year, stations, temperatures)
+
+    val temperature_filename = base_dir + year + ".csv"
+    val stations_filename = base_dir + "stations.csv"
+    val foo = Extraction.locateTemperaturesSpark(year, stations_filename, temperature_filename)
+    //    val foo = Extraction.locateTemperaturesSpark(year, stations, temperatures)
+    val bar = Extraction.averageRecordsSpark(foo)
+    val image = Visualization.visualizeSpark(bar, color_scale)
+    //    assert(foo.size == 1)
+    val zonedDateTimeIst = ZonedDateTime.now()
+    val name = "spagetti_"+zonedDateTimeIst.getHour.toString +"_"+zonedDateTimeIst.getMinute.toString + ".png"
+    val path = new File(".").getCanonicalFile +"/"+ name
+    image.output(new File(path))
 
   }
 }
