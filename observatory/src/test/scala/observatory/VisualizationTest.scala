@@ -100,7 +100,8 @@ trait VisualizationTest extends FunSuite with Checkers {
 
 
   test("make image spark") {
-    val base_dir = "/src/main/resources/"
+//    val base_dir = "/src/main/resources/"
+    val base_dir = "/"
     val year = 1975
 
     val STATION_COUNT = 10
