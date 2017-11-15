@@ -121,7 +121,7 @@ trait VisualizationTest extends FunSuite with Checkers {
     val zonedDateTimeIst = ZonedDateTime.now()
     val name = "spagetti_"+zonedDateTimeIst.getHour.toString +"_"+zonedDateTimeIst.getMinute.toString + ".png"
     val path = new File(".").getCanonicalFile +"/"+ name
-    image.output(new File(path))
+//    image.output(new File(path))
 
   }
 }

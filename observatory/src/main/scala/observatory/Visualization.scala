@@ -51,8 +51,8 @@ object Visualization extends SparkJob {
       val theta2 = k.lat
       val lambda2 = k.lon
 
-      //c = Math.acos(Math.sin(theta1.toRadians) * Math.sin(theta2.toRadians) + Math.cos(theta1.toRadians) * Math.cos(theta2.toRadians) * Math.cos(Math.abs(lambda1.toRadians - lambda2.toRadians)))
-      c = cheap_acos(cheap_sin(theta1) * cheap_sin(theta2) + cheap_cos(theta1) * cheap_cos(theta2) * cheap_cos(Math.abs(lambda1 - lambda2)))
+      c = Math.acos(Math.sin(theta1.toRadians) * Math.sin(theta2.toRadians) + Math.cos(theta1.toRadians) * Math.cos(theta2.toRadians) * Math.cos(Math.abs(lambda1.toRadians - lambda2.toRadians)))
+      //c = cheap_acos(cheap_sin(theta1) * cheap_sin(theta2) + cheap_cos(theta1) * cheap_cos(theta2) * cheap_cos(Math.abs(lambda1 - lambda2)))
 
     }
     EARTH_RADIUS_KM * c
@@ -260,32 +260,33 @@ object Visualization extends SparkJob {
     * @return A 360×180 image where each pixel shows the predicted temperature at its location
     */
   def visualize(temperatures: Iterable[(Location, Temperature)], colors: Iterable[(Temperature, Color)]): Image = {
-    val image: Image = Image(360, 180)
-
-    for (longitude <- -180 to 180 - 1; latitude <- -90 to 90 - 1) {
-      val temperature = predictTemperature(temperatures, Location(latitude, longitude))
-      if (temperature.isNaN) {
-        println("this is not the temp you're looking for NaN")
-      }
-      val color = interpolateColor(colors, temperature)
-      val x = longitude + 180
-      val y = latitude + 90
-      image.setPixel(x, y, RGBColor(color.red, color.green, color.blue).toPixel)
-    }
-
-
-    //    temperatures.foreach((loc_temp)=>{
-    //      val loc = loc_temp._1
-    //      val temperature = predictTemperature(temperatures, loc)
-    //      if(temperature.isNaN){
-    //        println("this is not the temp you're looking for NaN")
-    //      }
-    //      val color = interpolateColor(colors, temperature)
-    //      val x = loc.lon.toInt + 180
-    //      val y = loc.lat.toInt + 90
-    //      image.setPixel(x, y, RGBColor(color.red, color.green, color.blue).toPixel)
-    //    })
-    image.flipY
+    visualizeSpark(sc.parallelize(temperatures.toList), colors)
+//    val image: Image = Image(360, 180)
+//
+//    for (longitude <- -180 to 180 - 1; latitude <- -90 to 90 - 1) {
+//      val temperature = predictTemperature(temperatures, Location(latitude, longitude))
+//      if (temperature.isNaN) {
+//        println("this is not the temp you're looking for NaN")
+//      }
+//      val color = interpolateColor(colors, temperature)
+//      val x = longitude + 180
+//      val y = latitude + 90
+//      image.setPixel(x, y, RGBColor(color.red, color.green, color.blue).toPixel)
+//    }
+//
+//
+//    //    temperatures.foreach((loc_temp)=>{
+//    //      val loc = loc_temp._1
+//    //      val temperature = predictTemperature(temperatures, loc)
+//    //      if(temperature.isNaN){
+//    //        println("this is not the temp you're looking for NaN")
+//    //      }
+//    //      val color = interpolateColor(colors, temperature)
+//    //      val x = loc.lon.toInt + 180
+//    //      val y = loc.lat.toInt + 90
+//    //      image.setPixel(x, y, RGBColor(color.red, color.green, color.blue).toPixel)
+//    //    })
+//    image.flipY
 
 
   }
@@ -319,16 +320,15 @@ object Visualization extends SparkJob {
 
 
     // make lat lon pairs
-    val world_location: List[Location] =
-      for (lat_deg <- lat_deg_range.toList;
-           lon_deg <- lon_deg_range.toList)
-        yield Location(lat_deg, lon_deg)
+//    val world_location: List[Location] =
+//      for (lat_deg <- lat_deg_range.toList;
+//           lon_deg <- lon_deg_range.toList)
+//        yield Location(lat_deg, lon_deg)
+//    val pixels = sc.parallelize(world_location)
+//      .map(some_func).collect.toSeq
 
-    //    val pixels = temperatures.map(_._1)
-    //      .map(some_func).collect.toSeq
-
-    val pixels = sc.parallelize(world_location)
-      .map(some_func).collect.toSeq
+        val pixels = temperatures.map(_._1)
+          .map(some_func).collect.toSeq
 
     //      val pixels = sc.parallelize(0 to (width) * (height) -1).map(index => {
     //        some_func(Location(index/width, index%width))

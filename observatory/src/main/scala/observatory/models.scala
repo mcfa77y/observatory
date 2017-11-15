@@ -8,7 +8,20 @@ import java.time.LocalDate
   * @param lat Degrees of latitude, -90 ≤ lat ≤ 90
   * @param lon Degrees of longitude, -180 ≤ lon ≤ 180
   */
-case class Location(lat: Double, lon: Double)
+case class Location(lat: Double, lon: Double){
+
+  override def equals(other: Any): Boolean = other match {
+    case that: Location =>
+      lat == that.lat &&
+        lon == that.lon
+    case _ => false
+  }
+
+  override def hashCode(): Int = {
+    val state = Seq(lat, lon)
+    state.map(_.hashCode()).foldLeft(0)((a, b) => 31 * a + b)
+  }
+}
 
 case class Station(id: String, wban: String, location: Location)
 case class TemperatureRecord(station_id: String, station_wban: String, localDate: LocalDate, temperature_F: Temperature)
@@ -45,4 +58,3 @@ case class CellPoint(x: Double, y: Double)
   * @param blue Level of blue, 0 ≤ blue ≤ 255
   */
 case class Color(red: Int, green: Int, blue: Int)
-
