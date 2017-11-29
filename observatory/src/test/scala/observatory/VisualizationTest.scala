@@ -72,11 +72,13 @@ trait VisualizationTest extends FunSuite with Checkers {
     val bar = Visualization.interpolateColor(points, 1.25)
     assert(bar == Color(191,0,64))
   }
+
+
   test("make image") {
     val base_dir = "/src/main/resources/"
     val year = 1975
 
-    val STATION_COUNT = 10
+//    val STATION_COUNT = 10
     //    val stations: RDD[Station] = sc.parallelize(Array((Station("id_0", "wban_0", Location(100d, 100d)))))
 //    val stations: RDD[String] = sc.parallelize(generateStations(STATION_COUNT))
 //    val temperatures: RDD[String] = sc.parallelize(generateTemps(STATION_COUNT))
@@ -93,7 +95,7 @@ trait VisualizationTest extends FunSuite with Checkers {
     val zonedDateTimeIst = ZonedDateTime.now()
     val name = "spagetti_"+zonedDateTimeIst.getHour.toString +"_"+zonedDateTimeIst.getMinute.toString + ".png"
     val path = new File(".").getCanonicalFile +"/"+ name
-    image.output(new File(path))
+//    image.output(new File(path))
 
   }
 

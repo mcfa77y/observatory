@@ -2,6 +2,8 @@ package observatory
 
 import java.time.LocalDate
 
+import scala.math.{cos, log, tan, toRadians, Pi}
+
 /**
   * Introduced in Week 1. Represents a location on the globe.
   *
@@ -9,7 +11,29 @@ import java.time.LocalDate
   * @param lon Degrees of longitude, -180 ≤ lon ≤ 180
   */
 case class Location(lat: Double, lon: Double){
+  var qk: String = ""
+  var tile: Tile = null
+  var zoom: Int = 8
+  def toTile(_zoom: Int): Tile = {
+    if (tile == null || zoom != _zoom) {
+      tile = Tile(
+        ((lon + 180.0) / 360.0 * (1 << _zoom)).toInt,
+        ((1 - log(tan(toRadians(lat)) + 1 / cos(toRadians(lat))) / Pi) / 2.0 * (1 << _zoom)).toInt,
+        _zoom)
+      zoom = _zoom
+    }
+    tile
+  }
 
+  def toQK(_zoom: Int): String = {
+    if(qk == "" || zoom != _zoom){
+
+      qk = toTile(_zoom).toQK()
+      zoom = _zoom
+    }
+    qk
+
+  }
   override def equals(other: Any): Boolean = other match {
     case that: Location =>
       lat == that.lat &&
@@ -21,6 +45,7 @@ case class Location(lat: Double, lon: Double){
     val state = Seq(lat, lon)
     state.map(_.hashCode()).foldLeft(0)((a, b) => 31 * a + b)
   }
+
 }
 
 case class Station(id: String, wban: String, location: Location)
@@ -34,7 +59,28 @@ case class TemperatureRecord(station_id: String, station_wban: String, localDate
   * @param y Y coordinate of the tile
   * @param zoom Zoom level, 0 ≤ zoom ≤ 19
   */
-case class Tile(x: Int, y: Int, zoom: Int)
+case class Tile(x: Int, y: Int, zoom: Int) {
+  def toLocation(): Location = {
+    val n = Math.pow(2d, zoom)
+    val lon_deg = x / n * 360.0 - 180.0d
+    val lat_deg = Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n))).toDegrees
+    Location(lat_deg, lon_deg)
+  }
+  def toQK(): String = {
+    var quadKey = ""
+    for(i <- zoom until 0 by -1){
+      var digit = 0
+      val mask = 1 << (i - 1)
+      if ((x & mask) != 0) digit += 1
+      if ((y & mask) != 0) {
+        digit += 1
+        digit += 1
+      }
+      quadKey += digit
+    }
+    quadKey
+  }
+}
 
 /**
   * Introduced in Week 4. Represents a point on a grid composed of
