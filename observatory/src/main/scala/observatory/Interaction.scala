@@ -42,12 +42,6 @@ object Interaction extends SparkJob {
     val zoom = 11
     val image = Image(width, height)
 
-    val qk_temp = sc.parallelize(temperatures.toList).map((loc_temp) =>{
-      val qk = loc_temp._1.toQK(zoom)
-      (qk, temperatures)
-    })
-
-
     //    println("\n\n =============== tile =============== ")
     //    println(tile)
     //    println("\n")
@@ -60,6 +54,18 @@ object Interaction extends SparkJob {
     //    println(" =============== \\tile =============== \n\n")
     val total = 256 * 256
     var counter = 0
+
+//    val bar = createChildrenTiles(tile, 8).foldRight(List[(Tile, Pixel)]()){
+//      (tile, acc) =>{
+//        val location = tileLocation(tile)
+//        val temp = Visualization.predictTemperature(temperatures, location)
+//        val color = Visualization.interpolateColor(colors, temp)
+//        val pixel = RGBColor(color.red, color.green, color.blue, 127).toPixel
+//        (tile, pixel) :: acc
+//      }
+//    }
+
+
     val bar = sc.parallelize(children_tiles).aggregate(List[(Tile, Pixel)]())(
       (acc: List[(Tile, Pixel)], tile: Tile) => {
         val location = tileLocation(tile)
@@ -74,7 +80,7 @@ object Interaction extends SparkJob {
         (tile, pixel) :: acc
       },
       (acc0: List[(Tile, Pixel)], acc1: List[(Tile, Pixel)]) => {
-        println("accumulating")
+        println("accumulating: " + acc0.size +" x " + acc1.size)
         acc0 ++ acc1
       }
     )
@@ -127,10 +133,10 @@ object Interaction extends SparkJob {
     }
   }
 
-  def createChildrenTiles(tile: Tile, original_zoom: Int): List[Tile] = {
-    val offset = 0 to (Math.pow(2, tile.zoom + 1) - 1).toInt
+  def createChildrenTiles(tile: Tile, zoom_until: Int): List[Tile] = {
+    val offset = 0 to (Math.pow(2, zoom_until) - 1).toInt
     val tiles = for (x_offset <- offset; y_offset <- offset) yield {
-      Tile(tile.x + x_offset, tile.y + y_offset, tile.zoom + 1)
+      Tile(tile.x *  + x_offset, tile.y + y_offset, zoom_until)
     }
     tiles.filter(tile => {
       //      val location = tileLocation(tile)
