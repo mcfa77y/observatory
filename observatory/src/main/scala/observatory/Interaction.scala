@@ -36,7 +36,7 @@ object Interaction extends SparkJob {
     */
   def tile(temperatures: Iterable[(Location, Temperature)], colors: Iterable[(Temperature, Color)], tile: Tile): Image = {
 
-    val zoom_until_offset = 7
+    val zoom_until_offset = 5
 
     println("\n\n =============== tile =============== ")
     println(tile)
@@ -75,11 +75,11 @@ object Interaction extends SparkJob {
         val temp = Visualization.predictTemperature(temperatures, location)
         val color = Visualization.interpolateColor(colors, temp)
         val pixel = RGBColor(color.red, color.green, color.blue, 127).toPixel
-        if (counter % 10 == 0) {
-          val percent = counter / total * 100
-          //          println("progress: " + percent.floor + "\t" + counter +" / " + total)
-        }
-        counter = counter + 1
+//        if (counter % 10 == 0) {
+//          val percent = counter / total * 100
+//          println("progress: " + percent.floor + "\t" + counter +" / " + total)
+//        }
+//        counter = counter + 1
         (tile, pixel) :: acc
       },
       (acc0: List[(Tile, Pixel)], acc1: List[(Tile, Pixel)]) => {
@@ -96,7 +96,7 @@ object Interaction extends SparkJob {
       }
     })
 
-    image
+    image.scaleTo(256, 256)
   }
 
   //

@@ -13,6 +13,7 @@ case class Location(lat: Double, lon: Double){
   var qk: String = ""
   var tile: Tile = null
   var zoom: Int = 8
+  var closest_locations: List[Location] = null
   def toTile(_zoom: Int): Tile = {
     if (tile == null || zoom != _zoom) {
       tile = Tile(
@@ -31,7 +32,6 @@ case class Location(lat: Double, lon: Double){
       zoom = _zoom
     }
     qk
-
   }
   override def equals(other: Any): Boolean = other match {
     case that: Location =>
