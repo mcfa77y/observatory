@@ -103,106 +103,44 @@ object Visualization extends SparkJob {
   }
 
 
-  def get_closest_locations_old(temperatures: Iterable[(Location, Temperature)],
+  def get_closest_locations(temperatures: Iterable[(Location, Temperature)],
                             location: Location,
                             distance_threshold_km: Double,
                             location_sample_count: Int
                            ): List[(Location, Temperature)] = {
-    //    def createKey(l0: Location): (Location, Location) = {
-    //      if (l0.lat * l0.lat + l0.lon * l0.lon < location.lat * location.lat + location.lon * location.lon)
-    //        (l0, location) else (location, l0)
-    //    }
-    //    var cache=collection.mutable.Map[(Location, Location), Double]()
-    //    cache ++ distance_cache
     val closest_locations: List[(Location, Temperature)] = temperatures
-      .filter(loc_temp => {
-//          loc_temp._1.toQK(11).contains(location.toQK(distance_threshold_km))
-        dist_KM(loc_temp._1, location) < distance_threshold_km
-      })
+      .filter(loc_temp => dist_KM(loc_temp._1, location) < distance_threshold_km)
       .take(location_sample_count).toList
 
     if (closest_locations.size < location_sample_count) {
       //      println("expanding radius to " + distance_threshold_km * 2)
-      get_closest_locations_old(temperatures, location, distance_threshold_km * 2, location_sample_count)
+      get_closest_locations(temperatures, location, distance_threshold_km * 2, location_sample_count)
     } else {
       closest_locations
     }
   }
 
 
-  def get_closest_locations(temperatures: Iterable[(Location, Temperature)],
+  def get_closest_locations_qk(temperatures: Iterable[(Location, Temperature)],
                             location: String,
                             distance_threshold_km: Int,
                             location_sample_count: Int
                            ): List[(Location, Temperature)] = {
-    //    def createKey(l0: Location): (Location, Location) = {
-    //      if (l0.lat * l0.lat + l0.lon * l0.lon < location.lat * location.lat + location.lon * location.lon)
-    //        (l0, location) else (location, l0)
-    //    }
-    //    var cache=collection.mutable.Map[(Location, Location), Double]()
-    //    cache ++ distance_cache
     val l = location.substring(0, distance_threshold_km)
     val closest_locations: List[(Location, Temperature)] = temperatures
       .filter(loc_temp => {
         val m = loc_temp._1.toQK(11)
         m.indexOf(l) == 0
-        //        dist_KM(loc_temp._1, location) < distance_threshold_km
       })
       .take(location_sample_count).toList
 
     if (closest_locations.size < location_sample_count) {
-      //      println("expanding radius to " + distance_threshold_km * 2)
-      get_closest_locations(temperatures, location, distance_threshold_km - 1, location_sample_count)
+      get_closest_locations_qk(temperatures, location, distance_threshold_km - 1, location_sample_count)
     } else {
       closest_locations
     }
   }
 
-
-  def get_closest_locations_spark(temperatures: RDD[(Location, Temperature)],
-                                  location: Location,
-                                  distance_threshold_km: Double,
-                                  location_sample_count: Int
-                                 ): List[(Location, Temperature)] = {
-    //    def createKey(l0: Location): (Location, Location) = {
-    //      if (l0.lat * l0.lat + l0.lon * l0.lon < location.lat * location.lat + location.lon * location.lon)
-    //        (l0, location) else (location, l0)
-    //    }
-    //    var cache=collection.mutable.Map[(Location, Location), Double]()
-    //    cache ++ distance_cache
-    val closest_locations: List[(Location, Temperature)] = temperatures
-      .filter(loc_temp => {
-        dist_KM(loc_temp._1, location) < distance_threshold_km
-      })
-      .take(location_sample_count).toList
-
-    if (closest_locations.size < location_sample_count) {
-      //      println("expanding radius to " + distance_threshold_km * 2)
-      get_closest_locations_spark(temperatures, location, distance_threshold_km * 2, location_sample_count)
-    } else {
-      closest_locations
-    }
-  }
-
-//  def get_closest_locations_qk(temperatures: RDD[(String, Temperature)],
-//                                  location: Location,
-//                                  distance_threshold_km: Double,
-//                                  location_sample_count: Int
-//                                 ): List[(Location, Temperature)] = {
-//
-//    val closest_locations: List[(Location, Temperature)] = temperatures
-//      .filter(loc_temp => {
-//        loc_temp._1
-//      })
-//      .take(location_sample_count).toList
-//
-//    if (closest_locations.size < location_sample_count) {
-//      //      println("expanding radius to " + distance_threshold_km * 2)
-//      get_closest_locations_spark(temperatures, location, distance_threshold_km * 2, location_sample_count)
-//    } else {
-//      closest_locations
-//    }
-//  }
 
 
   /**
@@ -211,13 +149,13 @@ object Visualization extends SparkJob {
     * @return The predicted temperature at `location`
     */
   def predictTemperature(temperatures: Iterable[(Location, Temperature)], location: Location): Temperature = {
-
-
-    val distance_threshold_km = 8
     val location_sample_count = Math.min(10, temperatures.size)
 
+    val distance_threshold_km = 100.0
+    val closest_locations: List[(Location, Temperature)] = get_closest_locations(temperatures, location, distance_threshold_km, location_sample_count)
 
-    val closest_locations: List[(Location, Temperature)] = get_closest_locations(temperatures, location.toQK(distance_threshold_km), distance_threshold_km, location_sample_count)
+    //    val distance_threshold_qk = 8
+    //    val closest_locations: List[(Location, Temperature)] = get_closest_locations_qk(temperatures, location.toQK(distance_threshold_qk), distance_threshold_qk, location_sample_count)
 
     val foo = closest_locations.find(_._1 == location)
     if (foo.isDefined) {
@@ -239,16 +177,16 @@ object Visualization extends SparkJob {
     //    predictTemperatureSpark(sc.parallelize(temperatures.toList), location)
   }
 
-  def predictTemperatureSpark(temperatures: RDD[(Location, Temperature)], location: Location): Temperature = {
-
-    val distance_threshold_km = 100
-    val location_sample_count = 4
-    val closest_locations = get_closest_locations_spark(temperatures, location, distance_threshold_km, location_sample_count)
-
-    val numerator = closest_locations.foldRight(0d)((data, acc) => acc + data._2 / dist_KM(data._1, location))
-    val denominator = closest_locations.foldRight(0d)((data, acc) => acc + 1 / dist_KM(data._1, location))
-    numerator / denominator
-  }
+//  def predictTemperatureSpark(temperatures: RDD[(Location, Temperature)], location: Location): Temperature = {
+//
+//    val distance_threshold_km = 100
+//    val location_sample_count = 4
+//    val closest_locations = get_closest_locations_spark(temperatures, location, distance_threshold_km, location_sample_count)
+//
+//    val numerator = closest_locations.foldRight(0d)((data, acc) => acc + data._2 / dist_KM(data._1, location))
+//    val denominator = closest_locations.foldRight(0d)((data, acc) => acc + 1 / dist_KM(data._1, location))
+//    numerator / denominator
+//  }
 
   /** @param points Pairs containing a value and its associated color
     * @param value  The value to interpolate

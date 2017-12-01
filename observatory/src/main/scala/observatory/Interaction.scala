@@ -2,7 +2,6 @@ package observatory
 
 import com.sksamuel.scrimage.{Image, Pixel, RGBColor}
 import observatory.utils.SparkJob
-import scala.math._
 
 /**
   * 3rd milestone: interactive visualization
@@ -21,7 +20,6 @@ object Interaction extends SparkJob {
   }
 
 
-
   def make_pairs(start_x: Int, start_y: Int, end_x: Int, end_y: Int): List[(Int, Int)] = {
     val x_range = start_x to end_x
     val y_range = start_y to end_y
@@ -37,50 +35,55 @@ object Interaction extends SparkJob {
     * @return A 256×256 image showing the contents of the given tile
     */
   def tile(temperatures: Iterable[(Location, Temperature)], colors: Iterable[(Temperature, Color)], tile: Tile): Image = {
-    val height = 256
-    val width = 256
-    val zoom = 11
+
+    val zoom_until_offset = 8
+
+    println("\n\n =============== tile =============== ")
+    println(tile)
+    println("\n")
+    if (temperatures.size < 100)
+      temperatures.foreach(println)
+    else
+      println("temperatures: " + temperatures.size)
+    println("\n")
+    colors.foreach(println)
+    println("\n")
+    val children_tiles = rec_createChildrenTilesZoomUntil(tile, tile.zoom + zoom_until_offset)
+    println("children tiles: " + children_tiles.size)
+    println(" =============== \\tile =============== \n\n")
+    val height = Math.pow(2, zoom_until_offset).toInt
+    val width = height
     val image = Image(width, height)
 
-    //    println("\n\n =============== tile =============== ")
-    //    println(tile)
-    //    println("\n")
-    //    temperatures.foreach(println)
-    //    println("\n")
-    //    colors.foreach(println)
-    //    println("\n")
-    val children_tiles = rec_createChildrenTiles(tile, tile.zoom)
-    //    children_tiles.foreach(println)
-    //    println(" =============== \\tile =============== \n\n")
-    val total = 256 * 256
+    val total = 256.0 * 256.0
     var counter = 0
 
-//    val bar = createChildrenTiles(tile, 8).foldRight(List[(Tile, Pixel)]()){
-//      (tile, acc) =>{
-//        val location = tileLocation(tile)
-//        val temp = Visualization.predictTemperature(temperatures, location)
-//        val color = Visualization.interpolateColor(colors, temp)
-//        val pixel = RGBColor(color.red, color.green, color.blue, 127).toPixel
-//        (tile, pixel) :: acc
-//      }
-//    }
+    //    val bar = createChildrenTiles(tile, 8).foldRight(List[(Tile, Pixel)]()){
+    //      (tile, acc) =>{
+    //        val location = tileLocation(tile)
+    //        val temp = Visualization.predictTemperature(temperatures, location)
+    //        val color = Visualization.interpolateColor(colors, temp)
+    //        val pixel = RGBColor(color.red, color.green, color.blue, 127).toPixel
+    //        (tile, pixel) :: acc
+    //      }
+    //    }
+    val koo = sc.parallelize(children_tiles).cache
 
-
-    val bar = sc.parallelize(children_tiles).aggregate(List[(Tile, Pixel)]())(
+    val bar = koo.aggregate(List[(Tile, Pixel)]())(
       (acc: List[(Tile, Pixel)], tile: Tile) => {
         val location = tileLocation(tile)
         val temp = Visualization.predictTemperature(temperatures, location)
         val color = Visualization.interpolateColor(colors, temp)
         val pixel = RGBColor(color.red, color.green, color.blue, 127).toPixel
         if (counter % 10 == 0) {
-          val percent = counter/total * 100
-          println("progress: " + percent.floor + "\t" + counter +" / " + total)
+          val percent = counter / total * 100
+          //          println("progress: " + percent.floor + "\t" + counter +" / " + total)
         }
         counter = counter + 1
         (tile, pixel) :: acc
       },
       (acc0: List[(Tile, Pixel)], acc1: List[(Tile, Pixel)]) => {
-        println("accumulating: " + acc0.size +" x " + acc1.size)
+        //        println("accumulating: " + acc0.size +" x " + acc1.size)
         acc0 ++ acc1
       }
     )
@@ -119,8 +122,10 @@ object Interaction extends SparkJob {
   //  }
 
 
-  def rec_createChildrenTiles(tile: Tile, original_zoom: Int): List[Tile] = {
-    if (original_zoom + 8 == tile.zoom) {
+
+
+  def rec_createChildrenTilesZoomUntil(tile: Tile, zoom_until: Int): List[Tile] = {
+    if (tile.zoom == zoom_until) {
       List(tile)
     } else {
       val tiles = for (x <- 0 to 1; y <- 0 to 1) yield {
@@ -128,24 +133,9 @@ object Interaction extends SparkJob {
       }
 
       tiles.foldLeft(List[Tile]())((acc, tile_prime) =>
-        acc ++ rec_createChildrenTiles(tile_prime, original_zoom)
+        acc ++ rec_createChildrenTilesZoomUntil(tile_prime, zoom_until)
       )
     }
-  }
-
-  def createChildrenTiles(tile: Tile, zoom_until: Int): List[Tile] = {
-    val offset = 0 to (Math.pow(2, zoom_until) - 1).toInt
-    val tiles = for (x_offset <- offset; y_offset <- offset) yield {
-      Tile(tile.x *  + x_offset, tile.y + y_offset, zoom_until)
-    }
-    tiles.filter(tile => {
-      //      val location = tileLocation(tile)
-      //      -86 <= location.lat && location.lat <= 86 &&
-      //        -181 <= location.lon && location.lon <= 181 &&
-      tile.x < 256 &&
-        tile.y < 256
-    }
-    ).toList
   }
 
   /**
@@ -160,9 +150,10 @@ object Interaction extends SparkJob {
                            yearlyData: Iterable[(Year, Data)],
                            generateImage: (Year, Tile, Data) => Unit
                          ): Unit = {
-    val tiles = (0 to 2)
+
+    val tiles = (0 to 3)
       .foldRight(List[Tile](Tile(0, 0, 0))) {
-        (zoom, acc) => acc ++ rec_createChildrenTiles(Tile(0, 0, zoom), zoom)
+        (zoom, acc) => acc ++ rec_createChildrenTilesZoomUntil(Tile(0, 0, 0), zoom)
       }
 
     for (tile <- tiles; yd <- yearlyData) {
@@ -171,5 +162,6 @@ object Interaction extends SparkJob {
       generateImage(year, tile, data)
     }
   }
+
 
 }

@@ -44,7 +44,7 @@ trait InteractionTest extends FunSuite with Checkers {
   }
 
   test("make interaction image") {
-    val tile = Tile(1,0,1)
+    val tile = Tile(0,0,0)
 
     val temps = List((Location(45.0,-90.0),20.0),
       (Location(45.0,90.0),0.0),
