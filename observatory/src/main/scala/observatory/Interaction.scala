@@ -36,7 +36,7 @@ object Interaction extends SparkJob {
     */
   def tile(temperatures: Iterable[(Location, Temperature)], colors: Iterable[(Temperature, Color)], tile: Tile): Image = {
 
-    val zoom_until_offset = 8
+    val zoom_until_offset = 7
 
     println("\n\n =============== tile =============== ")
     println(tile)

@@ -2,8 +2,7 @@ package observatory
 
 import java.time.LocalDate
 
-import scala.math.{cos, log, tan, toRadians, Pi}
-
+import org.apache.commons.math3.util.FastMath._
 /**
   * Introduced in Week 1. Represents a location on the globe.
   *
@@ -18,7 +17,7 @@ case class Location(lat: Double, lon: Double){
     if (tile == null || zoom != _zoom) {
       tile = Tile(
         ((lon + 180.0) / 360.0 * (1 << _zoom)).toInt,
-        ((1 - log(tan(toRadians(lat)) + 1 / cos(toRadians(lat))) / Pi) / 2.0 * (1 << _zoom)).toInt,
+        ((1 - log(tan(toRadians(lat)) + 1 / cos(toRadians(lat))) / PI) / 2.0 * (1 << _zoom)).toInt,
         _zoom)
       zoom = _zoom
     }
