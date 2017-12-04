@@ -1,9 +1,10 @@
 package observatory
 
 import com.sksamuel.scrimage.{Image, Pixel, RGBColor}
+import com.thesamet.spatial.{KDTree, KDTreeMap}
 import observatory.utils.SparkJob
 import org.apache.spark.rdd.RDD
-import org.apache.commons.math3.util.FastMath.{PI, acos, cos, sin, min, abs}
+import org.apache.commons.math3.util.FastMath.{PI, abs, acos, cos, min, sin}
 
 /**
   * 2nd milestone: basic visualization
@@ -58,6 +59,12 @@ object Visualization extends SparkJob {
 
   }
 
+  def dist_KM_easy(j: Location, k: Location): Double = {
+    val jp = Location((j.lat + 360) % 360, (j.lon + 180) % 180)
+    val kp = Location((k.lat + 360) % 360, (k.lon + 180) % 180)
+    Math.pow((jp.lat - kp.lat), 2) + Math.pow((jp.lon - kp.lon), 2)
+  }
+
 
   def get_closest_locations(temperatures: Iterable[(Location, Temperature)],
                             location: Location,
@@ -88,7 +95,7 @@ object Visualization extends SparkJob {
       .filter(loc_temp => {
         val loc = loc_temp._1
         val m = loc.toQK(11)
-        
+
         m.indexOf(l) == 0
       })
       .take(location_sample_count).toList
@@ -134,6 +141,31 @@ object Visualization extends SparkJob {
 
 //    val distance_threshold_qk = 8
 //    val closest_locations: List[(Location, Temperature)] = get_closest_locations_qk(temperatures, location.toQK(distance_threshold_qk), distance_threshold_qk, location_sample_count)
+
+    val foo = closest_locations.par.find(_._1 == location)
+    if (foo.isDefined) {
+      return foo.get._2
+    }
+    val zero = closest_locations.par.find((loc_temp) => dist_KM(loc_temp._1, location) == 0)
+    if (zero.isDefined) {
+      return zero.get._2
+    }
+    val numerator = closest_locations.foldRight(0d)((data, acc) => acc + data._2 / dist_KM(data._1, location))
+    val denominator = closest_locations.foldRight(0d)((data, acc) => acc + 1 / dist_KM(data._1, location))
+    if ((numerator / denominator).isNaN || denominator == 0) {
+      println("things are not right there is a NaN here!")
+      println("\tsize: " + closest_locations.size)
+      println("\tresult tl: " + numerator + "/" + denominator)
+    }
+
+    numerator / denominator
+  }
+
+
+  def predictTemperature(temperatures: KDTreeMap[Location, Temperature], location: Location): Temperature = {
+    val location_sample_count = min(10, temperatures.size)
+
+    val closest_locations: Seq[(Location, Temperature)] = temperatures.findNearest(location, location_sample_count)
 
     val foo = closest_locations.par.find(_._1 == location)
     if (foo.isDefined) {

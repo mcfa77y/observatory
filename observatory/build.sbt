@@ -15,6 +15,8 @@ scalacOptions ++= Seq(
   "-Xexperimental"
 )
 
+resolvers += "Sonatype OSS Releases" at "http://oss.sonatype.org/content/repositories/releases/"
+
 libraryDependencies ++= Seq(
   "com.sksamuel.scrimage" %% "scrimage-core" % "2.1.6", // for visualization
   // You don’t *have to* use Spark, but in case you want to, we have added the dependency
@@ -27,7 +29,9 @@ libraryDependencies ++= Seq(
   // You don’t *have to* use fs2, but in case you want to, we have added the dependency
   "co.fs2" %% "fs2-io" % "0.9.2",
   "org.scalacheck" %% "scalacheck" % "1.12.1" % Test,
-  "junit" % "junit" % "4.10" % Test
+  "junit" % "junit" % "4.10" % Test,
+  // kd tree
+  "com.thesamet" %% "kdtree" % "1.0.4"
 )
 
 courseId := "PCO2sYdDEeW0iQ6RUMSWEQ"
