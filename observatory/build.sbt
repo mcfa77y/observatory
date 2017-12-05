@@ -14,6 +14,7 @@ scalacOptions ++= Seq(
   "-Xfuture",
   "-Xexperimental"
 )
+resolvers += "Sonatype OSS Releases" at "http://oss.sonatype.org/content/repositories/releases/"
 
 resolvers += "Sonatype OSS Releases" at "http://oss.sonatype.org/content/repositories/releases/"
 

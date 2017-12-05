@@ -190,7 +190,53 @@ object Interaction extends SparkJob {
   ////    }
   //  }
 
+  def tile_KD(temperatures: KDTreeMap[Location, Double], colors: Iterable[(Temperature, Color)], tile: Tile): Image = {
 
+    val zoom_until_offset = 8
+
+    println("\n\n =============== tile =============== ")
+    println(tile)
+    println("\n")
+    if (temperatures.size < 100)
+      temperatures.foreach(println)
+    else
+      println("temperatures: " + temperatures.size)
+    println("\n")
+    colors.foreach(println)
+    println("\n")
+    val children_tiles = rec_createChildrenTilesZoomUntil(tile, tile.zoom + zoom_until_offset)
+    println("children tiles: " + children_tiles.size)
+    println(" =============== \\tile =============== \n\n")
+    val height = Math.pow(2, zoom_until_offset).toInt
+    val width = height
+    val image = Image(width, height)
+
+
+    val koo = sc.parallelize(children_tiles).cache
+
+    val bar = koo.aggregate(List[(Tile, Pixel)]())(
+      (acc: List[(Tile, Pixel)], tile: Tile) => {
+        val location = tileLocation(tile)
+        val temp = Visualization.predictTemperature_KD(temperatures, location)
+        val color = Visualization.interpolateColor(colors, temp)
+        val pixel = RGBColor(color.red, color.green, color.blue, 127).toPixel
+        (tile, pixel) :: acc
+      },
+      (acc0: List[(Tile, Pixel)], acc1: List[(Tile, Pixel)]) => {
+        acc0 ++ acc1
+      }
+    )
+
+    bar.foreach(_ match {
+      case (tile, pixel) => {
+        {
+          image.setPixel(tile.x % width, tile.y % height, pixel)
+        }
+      }
+    })
+
+    image.scaleTo(256, 256)
+  }
 
 
   def rec_createChildrenTilesZoomUntil(tile: Tile, zoom_until: Int): List[Tile] = {

@@ -2,7 +2,14 @@ package observatory
 
 import java.time.LocalDate
 
+import observatory.Visualization.{EARTH_RADIUS_KM, isAntipodal}
 import org.apache.commons.math3.util.FastMath._
+
+case class Station(id: String, wban: String, location: Location)
+case class TemperatureRecord(station_id: String, station_wban: String, localDate: LocalDate, temperature_F: Temperature)
+
+
+
 /**
   * Introduced in Week 1. Represents a location on the globe.
   *
@@ -13,7 +20,25 @@ case class Location(lat: Double, lon: Double){
   var qk: String = ""
   var tile: Tile = null
   var zoom: Int = 8
-  var closest_locations: List[Location] = null
+  def distance(_loc: Location): Double = {
+
+    var c = 0d
+    if (this.eq(_loc)) {
+      c = 0d
+    }
+    else if (isAntipodal(this, _loc)) {
+      c = PI
+    } else {
+      val theta1 = this.lat
+      val lambda1 = this.lon
+
+      val theta2 = _loc.lat
+      val lambda2 = _loc.lon
+
+      c = acos(sin(theta1.toRadians) * sin(theta2.toRadians) + cos(theta1.toRadians) * cos(theta2.toRadians) * cos(abs(lambda1.toRadians - lambda2.toRadians)))
+    }
+    EARTH_RADIUS_KM * c
+  }
   def toTile(_zoom: Int): Tile = {
     if (tile == null || zoom != _zoom) {
       tile = Tile(
@@ -47,8 +72,6 @@ case class Location(lat: Double, lon: Double){
 
 }
 
-case class Station(id: String, wban: String, location: Location)
-case class TemperatureRecord(station_id: String, station_wban: String, localDate: LocalDate, temperature_F: Temperature)
 
 /**
   * Introduced in Week 3. Represents a tiled web map tile.
