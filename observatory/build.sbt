@@ -32,7 +32,9 @@ libraryDependencies ++= Seq(
   "org.scalacheck" %% "scalacheck" % "1.12.1" % Test,
   "junit" % "junit" % "4.10" % Test,
   // kd tree
-  "com.thesamet" %% "kdtree" % "1.0.4"
+  "com.thesamet" %% "kdtree" % "1.0.4",
+  // memoization from scalaz lib
+  "org.scalaz" %% "scalaz-core" % "7.2.17"
 )
 
 courseId := "PCO2sYdDEeW0iQ6RUMSWEQ"

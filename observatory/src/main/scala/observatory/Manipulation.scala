@@ -1,5 +1,7 @@
 package observatory
 
+import scalaz.Memo
+
 /**
   * 4th milestone: value-added information
   */
@@ -11,7 +13,11 @@ object Manipulation {
     *         returns the predicted temperature at this location
     */
   def makeGrid(temperatures: Iterable[(Location, Temperature)]): GridLocation => Temperature = {
-    ???
+
+    def makeGrid_slow(gl: GridLocation):Temperature = {
+      Visualization.predictTemperature(temperatures, Location(gl.lat, gl.lon))
+    }
+    Memo.mutableHashMapMemo (makeGrid_slow)
   }
 
   /**
