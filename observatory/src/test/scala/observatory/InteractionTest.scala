@@ -8,11 +8,10 @@ import org.scalatest.FunSuite
 import org.scalatest.prop.Checkers
 
 
-
 trait InteractionTest extends FunSuite with Checkers {
 
   test("qk") {
-    assert(Tile(3,5,3).toQK() == "213")
+    assert(Tile(3, 5, 3).toQK() == "213")
   }
   test("make proper interaction image") {
     val color_scale: Iterable[(Temperature, Color)] = List((60, Color(255, 255, 255)),
@@ -27,7 +26,7 @@ trait InteractionTest extends FunSuite with Checkers {
     val year = 1975
 
 
-    val tile = Tile(0,0,0)
+    val tile = Tile(0, 0, 0)
     val temperature_filename = base_dir + year + ".csv"
     val stations_filename = base_dir + "stations.csv"
 
@@ -37,31 +36,55 @@ trait InteractionTest extends FunSuite with Checkers {
     val image = Interaction.tile(temps.collect().toList, color_scale, tile)
 
     val zonedDateTimeIst = ZonedDateTime.now()
-    val name = "spagetti_"+zonedDateTimeIst.getHour.toString +"_"+zonedDateTimeIst.getMinute.toString + ".png"
-    val path = new File(".").getCanonicalFile +"/"+ name
+    val name = "spagetti_" + zonedDateTimeIst.getHour.toString + "_" + zonedDateTimeIst.getMinute.toString + ".png"
+    val path = new File(".").getCanonicalFile + "/" + name
     image.output(new File(path))
 
   }
 
   test("make interaction image") {
-    val tile = Tile(0,0,0)
+    val tile = Tile(0, 0, 0)
 
-    val temps = List((Location(45.0,-90.0),20.0),
-      (Location(45.0,90.0),0.0),
-      (Location(0.0,0.0),10.0),
-      (Location(-45.0,-90.0),0.0),
-      (Location(-45.0,90.0),20.0))
+    val temps = List((Location(45.0, -90.0), 20.0),
+      (Location(45.0, 90.0), 0.0),
+      (Location(0.0, 0.0), 10.0),
+      (Location(-45.0, -90.0), 0.0),
+      (Location(-45.0, 90.0), 20.0))
 
-    val colors = List((0.0,Color(255,0,0)),
-      (10.0,Color(0,255,0)),
-      (20.0,Color(0,0,255)))
+    val colors = List((0.0, Color(255, 0, 0)),
+      (10.0, Color(0, 255, 0)),
+      (20.0, Color(0, 0, 255)))
 
     val image = Interaction.tile(temps, colors, tile)
 
     val zonedDateTimeIst = ZonedDateTime.now()
-    val name = "spagetti_"+zonedDateTimeIst.getHour.toString +"_"+zonedDateTimeIst.getMinute.toString + ".png"
-    val path = new File(".").getCanonicalFile +"/"+ name
+    val name = "spagetti_" + zonedDateTimeIst.getHour.toString + "_" + zonedDateTimeIst.getMinute.toString + ".png"
+    val path = new File(".").getCanonicalFile + "/" + name
     image.output(new File(path))
+
+  }
+
+
+  test("make interaction image 4 ") {
+    val tile = Tile(0, 0, 0)
+    val ct = Interaction.rec_createChildrenTilesZoomUntil(tile, 4)
+    val temps = List((Location(45.0, -90.0), 20.0),
+      (Location(45.0, 90.0), 0.0),
+      (Location(0.0, 0.0), 10.0),
+      (Location(-45.0, -90.0), 0.0),
+      (Location(-45.0, 90.0), 20.0))
+
+    val colors = List((0.0, Color(255, 0, 0)),
+      (10.0, Color(0, 255, 0)),
+      (20.0, Color(0, 0, 255)))
+    ct.par.foreach(tile => {
+      val image = Interaction.tile(temps, colors, tile)
+      val tile_name = tile.x + "-" + tile.y
+      val name = tile_name + ".png"
+      val path = new File("./target/temperatures/1975/" + tile.zoom).getCanonicalFile + "/" + name
+      image.output(new File(path))
+    })
+
 
   }
 

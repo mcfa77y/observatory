@@ -2,7 +2,7 @@ package observatory
 
 import java.time.LocalDate
 
-import scala.math.{cos, log, tan, toRadians, Pi}
+import org.apache.commons.math3.util.FastMath._
 
 /**
   * Introduced in Week 1. Represents a location on the globe.
@@ -11,14 +11,20 @@ import scala.math.{cos, log, tan, toRadians, Pi}
   * @param lon Degrees of longitude, -180 ≤ lon ≤ 180
   */
 case class Location(lat: Double, lon: Double){
+
   var qk: String = ""
   var tile: Tile = null
   var zoom: Int = 8
+
+  def isAntipodal(j: Location): Boolean = {
+    j.lat == -lat && (j.lon == lon + 180 || j.lon == lon - 180)
+  }
+
   def toTile(_zoom: Int): Tile = {
     if (tile == null || zoom != _zoom) {
       tile = Tile(
         ((lon + 180.0) / 360.0 * (1 << _zoom)).toInt,
-        ((1 - log(tan(toRadians(lat)) + 1 / cos(toRadians(lat))) / Pi) / 2.0 * (1 << _zoom)).toInt,
+        ((1 - log(tan(toRadians(lat)) + 1 / cos(toRadians(lat))) / PI) / 2.0 * (1 << _zoom)).toInt,
         _zoom)
       zoom = _zoom
     }
@@ -27,11 +33,30 @@ case class Location(lat: Double, lon: Double){
 
   def toQK(_zoom: Int): String = {
     if(qk == "" || zoom != _zoom){
-
       qk = toTile(_zoom).toQK()
       zoom = _zoom
     }
     qk
+  }
+  def distance(j: Location): Double = {
+    val EARTH_RADIUS_KM = 6371d
+    var c = 0d
+    if (j.eq(this)) {
+      c = 0d
+    }
+    else if (isAntipodal(j)) {
+      c = PI
+    }
+    else {
+      val theta1 = j.lat.toRadians
+      val lambda1 = j.lon.toRadians
+
+      val theta2 = lat.toRadians
+      val lambda2 = lon.toRadians
+
+      c = acos(sin(theta1) * sin(theta2) + cos(theta1) * cos(theta2) * cos(abs(lambda1 - lambda2)))
+    }
+    EARTH_RADIUS_KM * c
 
   }
   override def equals(other: Any): Boolean = other match {
@@ -88,7 +113,20 @@ case class Tile(x: Int, y: Int, zoom: Int) {
   * @param lat Circle of latitude in degrees, -89 ≤ lat ≤ 90
   * @param lon Line of longitude in degrees, -180 ≤ lon ≤ 179
   */
-case class GridLocation(lat: Int, lon: Int)
+case class GridLocation(lat: Int, lon: Int) {
+  def toLocation(): Location = Location(lat, lon)
+  override def equals(other: Any): Boolean = other match {
+    case that: GridLocation =>
+      lat == that.lat &&
+        lon == that.lon
+    case _ => false
+  }
+
+  override def hashCode(): Int = {
+    val state = Seq(lat, lon)
+    state.map(_.hashCode()).foldLeft(0)((a, b) => 31 * a + b)
+  }
+}
 
 /**
   * Introduced in Week 5. Represents a point inside of a grid cell.

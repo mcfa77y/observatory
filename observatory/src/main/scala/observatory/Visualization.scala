@@ -8,100 +8,32 @@ import org.apache.spark.rdd.RDD
   * 2nd milestone: basic visualization
   */
 object Visualization extends SparkJob {
-  def isAntipodal(j: Location, k: Location): Boolean = {
-    j.lat == -k.lat && (j.lon == k.lon + 180 || j.lon == k.lon - 180)
+
+  lazy val dist_KM: ((Location, Location)) => Double = memoize {
+    case (x: Location, y: Location) => x.distance(y)
   }
 
-  class Memoize1[-T, +R](f: T => R) extends (T => R) {
+  lazy val get_closest_locations_memo: ((Iterable[(Location, Temperature)],
+                                        Location,
+                                        Double,
+                                        Int
+    )) => List[(Location, Temperature)] = memoize {
+    case (temperatures: Iterable[(Location, Temperature)],
+    location: Location,
+    distance_threshold_km: Double,
+    location_sample_count: Int) => {
+      val closest_locations: List[(Location, Temperature)] = temperatures
+        .filter(loc_temp => dist_KM(createKey(loc_temp._1, location)) < distance_threshold_km)
+        .take(location_sample_count).toList
 
-    import scala.collection.mutable
-
-    private[this] val vals = mutable.Map.empty[T, R]
-
-    def apply(x: T): R = {
-      if (vals.contains(x)) {
-        vals(x)
+      if (closest_locations.size < location_sample_count) {
+        //      println("expanding radius to " + distance_threshold_km * 2)
+        get_closest_locations_memo((temperatures, location, distance_threshold_km * 2, location_sample_count))
+      } else {
+        closest_locations
       }
-      else {
-        val y = f(x)
-        vals += ((x, y))
-        y
-      }
     }
   }
-
-  object Memoize1 {
-    def apply[T, R](f: T => R) = new Memoize1(f)
-  }
-
-  val EARTH_RADIUS_KM = 6371d
-
-  def dist_KM(j: Location, k: Location): Double = {
-
-    var c = 0d
-    if (j.eq(k)) {
-      c = 0d
-    }
-    else if (isAntipodal(j, k)) {
-      c = Math.PI
-    } else {
-      val theta1 = j.lat
-      val lambda1 = j.lon
-
-      val theta2 = k.lat
-      val lambda2 = k.lon
-
-      c = Math.acos(Math.sin(theta1.toRadians) * Math.sin(theta2.toRadians) + Math.cos(theta1.toRadians) * Math.cos(theta2.toRadians) * Math.cos(Math.abs(lambda1.toRadians - lambda2.toRadians)))
-      //c = cheap_acos(cheap_sin(theta1) * cheap_sin(theta2) + cheap_cos(theta1) * cheap_cos(theta2) * cheap_cos(Math.abs(lambda1 - lambda2)))
-
-    }
-    EARTH_RADIUS_KM * c
-
-  }
-
-
-  //  val TO_RADIANS = 0.01745329251
-  //  val COS_ANS = Array(1, 0.984807753, 0.9396926209, 0.8660254039, 0.7660444434, 0.6427876101, 0.5000000005, 0.342020144, 0.1736481785, 0.0000000008948966625, -0.1736481767, -0.3420201423, -0.499999999, -0.6427876087, -0.7660444422, -0.866025403, -0.9396926202, -0.9848077527, -1, -0.9848077533, -0.9396926215, -0.8660254048, -0.7660444445, -0.6427876114, -0.5000000021, -0.3420201457, -0.1736481802, -0.000000002684689987, 0.1736481749, 0.3420201406, 0.4999999974, 0.6427876073, 0.7660444411, 0.8660254021, 0.9396926196, 0.9848077524)
-  //  val ACOS_ANS = Array(0, 0.08726646255, 0.1745329251, 0.2617993877, 0.3490658502, 0.4363323128, 0.5235987753, 0.6108652379, 0.6981317004, 0.785398163, 0.8726646255, 0.9599310881, 1.047197551, 1.134464013, 1.221730476, 1.308996938, 1.396263401, 1.483529863, 1.570796326, 1.658062788, 1.745329251, 1.832595714, 1.919862176, 2.007128639, 2.094395101, 2.181661564, 2.268928026, 2.356194489, 2.443460951, 2.530727414, 2.617993877, 2.705260339, 2.792526802, 2.879793264, 2.967059727, 3.054326189, 3.141592654)
-  val COS_ANS = for (deg <- 0 to 360) yield Math.cos(deg.toRadians)
-  val ACOS_ANS = for (x <- -100 to 100) yield Math.acos(x / 100d)
-  val acos_index = map_to(1, -1, 0, ACOS_ANS.size)
-
-  def cheap_acos(x: Double): Double = {
-    var index = acos_index(x).toInt
-    if (index < 0) {
-      //      println("acos: offending x = " + x)
-      0
-    }
-    else if (index >= ACOS_ANS.size) {
-      ACOS_ANS.size - 1
-    }
-    else {
-      ACOS_ANS(index)
-    }
-
-  }
-
-  val cos_index = map_to(0, 180, 0, COS_ANS.size)
-
-  def cheap_cos(theta_degree: Double): Double = {
-    if (theta_degree < 0) {
-      cheap_cos(-theta_degree)
-    }
-    else if (theta_degree > 180) {
-      -1 * COS_ANS(cos_index(theta_degree % 180).toInt)
-    }
-    else {
-      COS_ANS(cos_index(theta_degree % 180).toInt)
-    }
-
-
-  }
-
-  def cheap_sin(theta_degree: Double): Double = {
-    cheap_cos(90 - theta_degree)
-  }
-
 
   def get_closest_locations(temperatures: Iterable[(Location, Temperature)],
                             location: Location,
@@ -109,7 +41,7 @@ object Visualization extends SparkJob {
                             location_sample_count: Int
                            ): List[(Location, Temperature)] = {
     val closest_locations: List[(Location, Temperature)] = temperatures
-      .filter(loc_temp => dist_KM(loc_temp._1, location) < distance_threshold_km)
+      .filter(loc_temp => dist_KM(createKey(loc_temp._1, location)) < distance_threshold_km)
       .take(location_sample_count).toList
 
     if (closest_locations.size < location_sample_count) {
@@ -141,7 +73,10 @@ object Visualization extends SparkJob {
     }
   }
 
-
+  def createKey(l0: Location, l1: Location): (Location, Location) = {
+    if (l0.lat * l0.lat + l0.lon * l0.lon < l1.lat * l1.lat + l1.lon * l1.lon)
+      (l0, l1) else (l1, l0)
+  }
 
   /**
     * @param temperatures Known temperatures: pairs containing a location and the temperature at this location
@@ -149,9 +84,10 @@ object Visualization extends SparkJob {
     * @return The predicted temperature at `location`
     */
   def predictTemperature(temperatures: Iterable[(Location, Temperature)], location: Location): Temperature = {
-    val location_sample_count = Math.min(10, temperatures.size)
 
+    val location_sample_count = Math.min(10, temperatures.size)
     val distance_threshold_km = 100.0
+//    val closest_locations: List[(Location, Temperature)] = get_closest_locations_memo((temperatures, location, distance_threshold_km, location_sample_count))
     val closest_locations: List[(Location, Temperature)] = get_closest_locations(temperatures, location, distance_threshold_km, location_sample_count)
 
     //    val distance_threshold_qk = 8
@@ -161,12 +97,12 @@ object Visualization extends SparkJob {
     if (foo.isDefined) {
       return foo.get._2
     }
-    val zero = closest_locations.find((loc_temp) => dist_KM(loc_temp._1, location) == 0)
+    val zero = closest_locations.find((loc_temp) => dist_KM(createKey(loc_temp._1, location)) == 0)
     if (zero.isDefined) {
       return zero.get._2
     }
-    val numerator = closest_locations.foldRight(0d)((data, acc) => acc + data._2 / dist_KM(data._1, location))
-    val denominator = closest_locations.foldRight(0d)((data, acc) => acc + 1 / dist_KM(data._1, location))
+    val numerator = closest_locations.foldRight(0d)((data, acc) => acc + data._2 / dist_KM(createKey(data._1, location)))
+    val denominator = closest_locations.foldRight(0d)((data, acc) => acc + 1 / dist_KM(createKey(data._1, location)))
     if ((numerator / denominator).isNaN || denominator == 0) {
       println("things are not right there is a NaN here!")
       println("\tsize: " + closest_locations.size)
@@ -311,7 +247,7 @@ object Visualization extends SparkJob {
     //        some_func(Location(index/width, index%width))
     //      }).collect.toSeq
 
-    pixels
+    pixels.par
       .filter(pixel_record => pixel_record.x < width && pixel_record.y < height)
       .foreach((pixel_record: Pixel_Record) => {
         image.setPixel(pixel_record.x, pixel_record.y, pixel_record.pixel)

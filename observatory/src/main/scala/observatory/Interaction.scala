@@ -37,49 +37,33 @@ object Interaction extends SparkJob {
   def tile(temperatures: Iterable[(Location, Temperature)], colors: Iterable[(Temperature, Color)], tile: Tile): Image = {
 
     val zoom_until_offset = 8
-
-    println("\n\n =============== tile =============== ")
-    println(tile)
-    println("\n")
-    if (temperatures.size < 100)
-      temperatures.foreach(println)
-    else
-      println("temperatures: " + temperatures.size)
-    println("\n")
-    colors.foreach(println)
-    println("\n")
     val children_tiles = rec_createChildrenTilesZoomUntil(tile, tile.zoom + zoom_until_offset)
-    println("children tiles: " + children_tiles.size)
-    println(" =============== \\tile =============== \n\n")
+//    println("\n\n =============== tile =============== ")
+//    println(tile)
+//    println("\n")
+//    if (temperatures.size < 100)
+//      temperatures.foreach(println)
+//    else
+//      println("temperatures: " + temperatures.size)
+//    println("\n")
+//    colors.foreach(println)
+//    println("\n")
+//
+//    println("children tiles: " + children_tiles.size)
+//    println(" =============== \\tile =============== \n\n")
     val height = Math.pow(2, zoom_until_offset).toInt
     val width = height
     val image = Image(width, height)
 
-    val total = 256.0 * 256.0
-    var counter = 0
-
-    //    val bar = createChildrenTiles(tile, 8).foldRight(List[(Tile, Pixel)]()){
-    //      (tile, acc) =>{
-    //        val location = tileLocation(tile)
-    //        val temp = Visualization.predictTemperature(temperatures, location)
-    //        val color = Visualization.interpolateColor(colors, temp)
-    //        val pixel = RGBColor(color.red, color.green, color.blue, 127).toPixel
-    //        (tile, pixel) :: acc
-    //      }
-    //    }
-    val koo = sc.parallelize(children_tiles).cache
-
-    val bar = koo.aggregate(List[(Tile, Pixel)]())(
+//    val children_tiles_par = sc.parallelize(children_tiles).cache
+    val children_tiles_par = sc.parallelize(children_tiles).cache
+    val bar = children_tiles_par.aggregate(List[(Tile, Pixel)]())(
       (acc: List[(Tile, Pixel)], tile: Tile) => {
         val location = tileLocation(tile)
         val temp = Visualization.predictTemperature(temperatures, location)
         val color = Visualization.interpolateColor(colors, temp)
         val pixel = RGBColor(color.red, color.green, color.blue, 127).toPixel
-        if (counter % 10 == 0) {
-          val percent = counter / total * 100
-          //          println("progress: " + percent.floor + "\t" + counter +" / " + total)
-        }
-        counter = counter + 1
+
         (tile, pixel) :: acc
       },
       (acc0: List[(Tile, Pixel)], acc1: List[(Tile, Pixel)]) => {
@@ -88,7 +72,7 @@ object Interaction extends SparkJob {
       }
     )
 
-    bar.foreach(_ match {
+    bar.par.foreach(_ match {
       case (tile, pixel) => {
         {
           image.setPixel(tile.x % width, tile.y % height, pixel)
