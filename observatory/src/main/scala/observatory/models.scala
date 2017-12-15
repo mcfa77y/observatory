@@ -34,6 +34,10 @@ case class Location(lat: Double, lon: Double){
     qk
 
   }
+  def toGridLocation(): GridLocation ={
+    GridLocation(lat.toInt, lon.toInt)
+  }
+
   override def equals(other: Any): Boolean = other match {
     case that: Location =>
       lat == that.lat &&
