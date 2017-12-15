@@ -1,11 +1,15 @@
 package observatory
 
-import scalaz.Memo
+import observatory.utils.SparkJob
+
 
 /**
   * 4th milestone: value-added information
   */
-object Manipulation {
+object Manipulation extends SparkJob {
+  lazy val predictTemperature: ((Iterable[(Location, Temperature)], Location)) => Temperature = memoize {
+    case (temperatures: Iterable[(Location, Temperature)], location: Location) => Visualization.predictTemperature(temperatures, location)
+  }
 
   /**
     * @param temperatures Known temperatures
@@ -13,11 +17,10 @@ object Manipulation {
     *         returns the predicted temperature at this location
     */
   def makeGrid(temperatures: Iterable[(Location, Temperature)]): GridLocation => Temperature = {
-
     def makeGrid_slow(gl: GridLocation):Temperature = {
-      Visualization.predictTemperature(temperatures, Location(gl.lat, gl.lon))
+      predictTemperature((temperatures, gl.toLocation()))
     }
-    Memo.mutableHashMapMemo (makeGrid_slow)
+    memoize(makeGrid_slow)
   }
 
   /**
@@ -26,7 +29,12 @@ object Manipulation {
     * @return A function that, given a latitude and a longitude, returns the average temperature at this location
     */
   def average(temperaturess: Iterable[Iterable[(Location, Temperature)]]): GridLocation => Temperature = {
-    ???
+    def avg_slow(gl: GridLocation): Temperature = {
+      temperaturess.map(lts => {
+        predictTemperature((lts, gl.toLocation()))
+      }).sum / temperaturess.size
+    }
+    memoize(avg_slow)
   }
 
   /**
@@ -35,7 +43,10 @@ object Manipulation {
     * @return A grid containing the deviations compared to the normal temperatures
     */
   def deviation(temperatures: Iterable[(Location, Temperature)], normals: GridLocation => Temperature): GridLocation => Temperature = {
-    ???
+    def deviation_slow(gl: GridLocation): Temperature = {
+      makeGrid(temperatures)(gl) - normals(gl)
+    }
+    memoize(deviation_slow)
   }
 
 
