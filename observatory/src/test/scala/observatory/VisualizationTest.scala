@@ -115,7 +115,7 @@ trait VisualizationTest extends FunSuite with Checkers {
 
     val temperature_filename = base_dir + year + ".csv"
     val stations_filename = base_dir + "stations.csv"
-    val foo = Extraction.locateTemperaturesSpark(year, stations_filename, temperature_filename)
+    val foo = Extraction.locateTemperaturesSpark(year, stations_filename, temperature_filename).sample(false, 0.01)
     //    val foo = Extraction.locateTemperaturesSpark(year, stations, temperatures)
     val bar = Extraction.averageRecordsSpark(foo)
     val image = Visualization.visualizeSpark(bar, color_scale)
@@ -123,7 +123,7 @@ trait VisualizationTest extends FunSuite with Checkers {
     val zonedDateTimeIst = ZonedDateTime.now()
     val name = "spagetti_"+zonedDateTimeIst.getHour.toString +"_"+zonedDateTimeIst.getMinute.toString + ".png"
     val path = new File(".").getCanonicalFile +"/"+ name
-//    image.output(new File(path))
+    image.output(new File(path))
 
   }
 }

@@ -77,7 +77,7 @@ object Visualization2 {
       }
     })
 
-    image
+    image.scaleTo(256,256)
 
 
   }

@@ -233,8 +233,6 @@ object Visualization extends SparkJob {
     val width = 360
     val height = 180
     val image: Image = Image(width, height)
-    val lon_deg_range = (-180 to 180 - 1)
-    val lat_deg_range = (-90 to 90 - 1)
 
     val get_x = map_to(-180, 180, 0, 360)
     val get_y = map_to(-90, 90, 0, 180)
@@ -251,21 +249,23 @@ object Visualization extends SparkJob {
 
 
     // make lat lon pairs
-//    val world_location: List[Location] =
-//      for (lat_deg <- lat_deg_range.toList;
-//           lon_deg <- lon_deg_range.toList)
-//        yield Location(lat_deg, lon_deg)
-//    val pixels = sc.parallelize(world_location)
-//      .map(some_func).collect.toSeq
+    val lon_deg_range = (-180 to 180 - 1)
+    val lat_deg_range = (-90 to 90 - 1)
+    val world_location: List[Location] =
+      for (lat_deg <- lat_deg_range.toList;
+           lon_deg <- lon_deg_range.toList)
+        yield Location(lat_deg, lon_deg)
+    val pixels = sc.parallelize(world_location)
+      .map(some_func).collect.toSeq
 
-        val pixels = temperatures.map(_._1)
-          .map(some_func).collect.toSeq
+//        val pixels = temperatures.map(_._1)
+//          .map(some_func).collect.toSeq
 
     //      val pixels = sc.parallelize(0 to (width) * (height) -1).map(index => {
     //        some_func(Location(index/width, index%width))
     //      }).collect.toSeq
 
-    pixels
+    pixels.par
       .filter(pixel_record => pixel_record.x < width && pixel_record.y < height)
       .foreach((pixel_record: Pixel_Record) => {
         image.setPixel(pixel_record.x, pixel_record.y, pixel_record.pixel)
